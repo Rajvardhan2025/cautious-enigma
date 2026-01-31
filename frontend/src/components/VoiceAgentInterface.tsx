@@ -16,17 +16,19 @@ import {
 import AvatarDisplay from './AvatarDisplay';
 import LiveTranscript from './LiveTranscript';
 import ConnectionStatus from './ConnectionStatus';
+import ToolCallDisplay from './ToolCallDisplay';
 import { ToolCall, ConversationSummaryData, TranscriptItem } from '../types';
 import { APP_CONSTANTS } from '../config/constants';
 
 interface VoiceAgentInterfaceProps {
   onToolCall: (toolCall: Omit<ToolCall, 'id' | 'timestamp'>) => void;
   onConversationEnd: (summary: ConversationSummaryData) => void;
+  onEndCall: () => void;
   toolCalls: ToolCall[];
   onDisconnect: () => void;
 }
 
-function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisconnect }: VoiceAgentInterfaceProps) {
+function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCalls, onDisconnect }: VoiceAgentInterfaceProps) {
   const room = useRoomContext();
   const connectionState = useConnectionState();
   const tracks = useTracks([Track.Source.Microphone, Track.Source.ScreenShare]);
@@ -80,6 +82,11 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
           onToolCall(data);
         } else if (data.type === 'conversation_summary') {
           onConversationEnd(data.summary);
+        } else if (data.type === 'end_call') {
+          onEndCall();
+          if (room) {
+            room.disconnect();
+          }
         } else if (data.type === 'transcript') {
           setTranscript(prev => [...prev, data]);
         }
@@ -161,11 +168,21 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
           <div className="flex-1 overflow-hidden bg-gradient-to-b from-gray-50 to-white">
             <LiveTranscript className="h-full" />
           </div>
+
+          <div className="border-t bg-white">
+            <div className="px-5 py-3">
+              <h3 className="text-sm font-semibold text-gray-700">Tool Calls</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Actions performed by the agent</p>
+            </div>
+            <div className="max-h-72 overflow-y-auto">
+              <ToolCallDisplay toolCalls={toolCalls} />
+            </div>
+          </div>
         </div>
 
         {/* Floating Control Bar */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20" style={{ marginRight: '200px' }}>
-          <ControlBar 
+          <ControlBar
             variation="minimal"
             controls={{
               microphone: true,

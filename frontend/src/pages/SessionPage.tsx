@@ -19,6 +19,8 @@ function SessionPage() {
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [conversationSummary, setConversationSummary] = useState<ConversationSummaryData | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [pendingDisconnect, setPendingDisconnect] = useState(false);
+  const [disconnected, setDisconnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,6 +30,11 @@ function SessionPage() {
   }, [token, url, roomName, navigate]);
 
   const handleDisconnect = () => {
+    if (showSummary || pendingDisconnect) {
+      setDisconnected(true);
+      return;
+    }
+
     navigate(ROUTES.HOME);
   };
 
@@ -42,6 +49,17 @@ function SessionPage() {
   const handleConversationEnd = (summary: ConversationSummaryData) => {
     setConversationSummary(summary);
     setShowSummary(true);
+  };
+
+  const handleEndCall = () => {
+    setPendingDisconnect(true);
+  };
+
+  const handleSummaryClose = () => {
+    setShowSummary(false);
+    if (disconnected || pendingDisconnect) {
+      navigate(ROUTES.HOME);
+    }
   };
 
   if (error) {
@@ -85,6 +103,7 @@ function SessionPage() {
         <VoiceAgentInterface
           onToolCall={handleToolCall}
           onConversationEnd={handleConversationEnd}
+          onEndCall={handleEndCall}
           toolCalls={toolCalls}
           onDisconnect={handleDisconnect}
         />
@@ -94,7 +113,7 @@ function SessionPage() {
       {showSummary && conversationSummary && (
         <ConversationSummary
           summary={conversationSummary}
-          onClose={() => setShowSummary(false)}
+          onClose={handleSummaryClose}
         />
       )}
     </div>

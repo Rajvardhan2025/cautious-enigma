@@ -45,8 +45,16 @@ def get_llm_instance():
     
     if provider == "cerebras":
         model = os.getenv("CEREBRAS_MODEL", "llama3.1-8b")
+        temperature = float(os.getenv("CEREBRAS_TEMPERATURE", "0.4"))
+        parallel_tool_calls = os.getenv("CEREBRAS_PARALLEL_TOOL_CALLS", "true").lower() == "true"
+        tool_choice = os.getenv("CEREBRAS_TOOL_CHOICE", "auto")
         logger.info(f"Using Cerebras with model: {model}")
-        return openai.LLM.with_cerebras(model=model)
+        return openai.LLM.with_cerebras(
+            model=model,
+            temperature=temperature,
+            parallel_tool_calls=parallel_tool_calls,
+            tool_choice=tool_choice,
+        )
     
     elif provider == "openai":
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -137,11 +145,13 @@ async def voice_appointment_agent(ctx: JobContext):
         # Add event listeners for session events
         @session.on("user_speech_committed")
         def on_user_speech(msg):
-            logger.info(f"🎤 User: {msg.text}")
+            logger.info(f"user: {msg.text}")
+            agent.context.last_user_message = msg.text
         
         @session.on("agent_speech_committed")
         def on_agent_speech(msg):
-            logger.info(f"🗣️  Agent: {msg.text}")
+            logger.info(f"agent: {msg.text}")
+            agent.context.last_agent_message = msg.text
         
         @session.on("agent_speech_interrupted")
         def on_agent_interrupted(msg):
