@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   useRoomContext,
-  useConnectionState,
   useTracks,
-  useLocalParticipant,
-  ControlBar,
-  useMaybeRoomContext
+  ControlBar
 } from '@livekit/components-react';
 import {
   RoomEvent,
@@ -15,9 +12,8 @@ import {
 
 import AvatarDisplay from './AvatarDisplay';
 import LiveTranscript from './LiveTranscript';
-import ConnectionStatus from './ConnectionStatus';
 import ToolCallDisplay from './ToolCallDisplay';
-import { ToolCall, ConversationSummaryData, TranscriptItem } from '../types';
+import { ToolCall, ConversationSummaryData } from '../types';
 import { APP_CONSTANTS } from '../config/constants';
 
 interface VoiceAgentInterfaceProps {
@@ -30,11 +26,9 @@ interface VoiceAgentInterfaceProps {
 
 function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCalls, onDisconnect }: VoiceAgentInterfaceProps) {
   const room = useRoomContext();
-  const connectionState = useConnectionState();
   const tracks = useTracks([Track.Source.Microphone, Track.Source.ScreenShare]);
 
   const [isAgentConnected, setIsAgentConnected] = useState(false);
-  const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -87,8 +81,6 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
           if (room) {
             room.disconnect();
           }
-        } else if (data.type === 'transcript') {
-          setTranscript(prev => [...prev, data]);
         }
       } catch (error) {
         console.error('Error parsing data:', error);
@@ -120,32 +112,6 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b px-6 py-4 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <span className="text-white text-xl">🎤</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Voice Assistant</h1>
-                <p className="text-xs text-gray-500">AI-Powered Appointment Booking</p>
-              </div>
-            </div>
-            <ConnectionStatus
-              connectionState={connectionState}
-              isAgentConnected={isAgentConnected}
-            />
-          </div>
-          <button
-            onClick={onDisconnect}
-            className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg transition-all hover:shadow-lg font-medium text-sm"
-          >
-            End Session
-          </button>
-        </div>
-      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
@@ -180,7 +146,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
           </div>
         </div>
 
-        {/* Floating Control Bar */}
+        {/* LiveKit Control Bar */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20" style={{ marginRight: '200px' }}>
           <ControlBar
             variation="minimal"
@@ -189,7 +155,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
               camera: false,
               screenShare: false,
               chat: false,
-              leave: false
+              leave: true
             }}
           />
         </div>
