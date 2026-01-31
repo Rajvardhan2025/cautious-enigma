@@ -60,70 +60,136 @@ server.setup_fnc = prewarm
 
 @server.rtc_session(agent_name="voice-appointment-agent")
 async def voice_appointment_agent(ctx: JobContext):
-    # Join the room and connect to the user
-    await ctx.connect()
-    
-    logger.info(f"Agent joining room: {ctx.room.name}")
+    try:
+        # Join the room and connect to the user
+        logger.info(f"🎯 Agent received job request for room: {ctx.room.name}")
+        
+        await ctx.connect()
+        
+        logger.info(f"✅ Agent connected to room: {ctx.room.name}")
 
-    # Logging setup
-    ctx.log_context_fields = {
-        "room": ctx.room.name,
-    }
-    
-    # Track if user has left
-    user_left = False
-    
-    @ctx.room.on("participant_disconnected")
-    def on_participant_disconnected(participant: rtc.RemoteParticipant):
-        nonlocal user_left
-        logger.info(f"Participant disconnected: {participant.identity}")
-        # If a human participant leaves, mark for cleanup
-        if not participant.identity.startswith("agent"):
-            user_left = True
+        # Logging setup
+        ctx.log_context_fields = {
+            "room": ctx.room.name,
+        }
+        
+        # Track if user has left
+        user_left = False
+        
+        @ctx.room.on("participant_connected")
+        def on_participant_connected(participant: rtc.RemoteParticipant):
+            logger.info(f"👤 Participant joined: {participant.identity} (kind: {participant.kind})")
+        
+        @ctx.room.on("participant_disconnected")
+        def on_participant_disconnected(participant: rtc.RemoteParticipant):
+            nonlocal user_left
+            logger.info(f"👋 Participant disconnected: {participant.identity}")
+            # If a human participant leaves, mark for cleanup
+            if not participant.identity.startswith("agent"):
+                user_left = True
+                logger.info(f"🚪 User left the room, preparing to cleanup")
 
-    # Set up voice AI pipeline with Deepgram and configurable LLM
-    session = AgentSession(
-        # Use Deepgram for STT
-        stt=deepgram.STT(
-            model="nova-3",
-            language="en",
-            smart_format=True,
-            interim_results=True,
-            endpointing_ms=400,  # Increased from 10ms to reduce false triggers
-        ),
-        # Use configured LLM (Gemini, Cerebras, or OpenAI)
-        llm=get_llm_instance(),
-        # Use Deepgram for TTS  
-        tts=deepgram.TTS(
-            model="aura-2-asteria-en",
-        ),
-        # VAD and turn detection
-        turn_detection=MultilingualModel(),
-        vad=ctx.proc.userdata["vad"],
-        preemptive_generation=False,  # Disable to prevent speaking before user finishes
-    )
-
-    # Start the session with our appointment agent
-    agent = VoiceAppointmentAgent()
-    await session.start(
-        agent=agent,
-        room=ctx.room,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                noise_cancellation=lambda params: noise_cancellation.BVCTelephony()
-                if params.participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-                else noise_cancellation.BVC(),
+        # Set up voice AI pipeline with Deepgram and configurable LLM
+        logger.info("🔧 Initializing agent session with STT, LLM, and TTS")
+        
+        session = AgentSession(
+            # Use Deepgram for STT
+            stt=deepgram.STT(
+                model="nova-3",
+                language="en",
+                smart_format=True,
+                interim_results=True,
+                endpointing_ms=400,  # Increased from 10ms to reduce false triggers
             ),
-            # Enable text output to send transcriptions to frontend
-            text_output=True,
-        ),
-    )
-    
-    # Send initial greeting
-    await session.say(
-        "Hi! I'm your appointment assistant. What's your phone number?",
-        allow_interruptions=True,
-    )
+            # Use configured LLM (Gemini, Cerebras, or OpenAI)
+            llm=get_llm_instance(),
+            # Use Deepgram for TTS  
+            tts=deepgram.TTS(
+                model="aura-2-asteria-en",
+            ),
+            # VAD and turn detection
+            turn_detection=MultilingualModel(),
+            vad=ctx.proc.userdata["vad"],
+            preemptive_generation=False,  # Disable to prevent speaking before user finishes
+        )
+        
+        logger.info("✅ Agent session initialized successfully")
+
+        # Start the session with our appointment agent
+        logger.info("🤖 Creating VoiceAppointmentAgent instance")
+        agent = VoiceAppointmentAgent()
+        
+        # Add event listeners for session events
+        @session.on("user_speech_committed")
+        def on_user_speech(msg):
+            logger.info(f"🎤 User said: {msg.text}")
+        
+        @session.on("agent_speech_committed")
+        def on_agent_speech(msg):
+            logger.info(f"🗣️  Agent said: {msg.text}")
+        
+        @session.on("agent_speech_interrupted")
+        def on_agent_interrupted(msg):
+            logger.info(f"⚠️  Agent speech interrupted: {msg.text}")
+        
+        @session.on("function_calls_collected")
+        def on_function_calls(calls):
+            for call in calls:
+                logger.info(f"🔧 Tool called: {call.function_info.name} with args: {call.arguments}")
+        
+        @session.on("function_calls_finished")
+        def on_function_finished(calls):
+            for call in calls:
+                if call.exception:
+                    logger.error(f"❌ Tool {call.function_info.name} failed: {call.exception}")
+                else:
+                    logger.info(f"✅ Tool {call.function_info.name} completed successfully")
+        
+        @session.on("user_started_speaking")
+        def on_user_started():
+            logger.debug("🎙️  User started speaking")
+        
+        @session.on("user_stopped_speaking")
+        def on_user_stopped():
+            logger.debug("🔇 User stopped speaking")
+        
+        @session.on("agent_started_speaking")
+        def on_agent_started():
+            logger.debug("🔊 Agent started speaking")
+        
+        @session.on("agent_stopped_speaking")
+        def on_agent_stopped():
+            logger.debug("🔇 Agent stopped speaking")
+        
+        logger.info("🚀 Starting agent session")
+        await session.start(
+            agent=agent,
+            room=ctx.room,
+            room_options=room_io.RoomOptions(
+                audio_input=room_io.AudioInputOptions(
+                    noise_cancellation=lambda params: noise_cancellation.BVCTelephony()
+                    if params.participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                    else noise_cancellation.BVC(),
+                ),
+                # Enable text output to send transcriptions to frontend
+                text_output=True,
+            ),
+        )
+        
+        logger.info("✅ Agent session started successfully")
+        
+        # Send initial greeting
+        logger.info("👋 Sending initial greeting to user")
+        await session.say(
+            "Hi! I'm your appointment assistant. What's your phone number?",
+            allow_interruptions=True,
+        )
+        
+        logger.info("🎧 Agent is now listening for user input")
+        
+    except Exception as e:
+        logger.error(f"❌ Fatal error in agent session: {e}", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":

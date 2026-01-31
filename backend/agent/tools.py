@@ -55,8 +55,10 @@ When booking:
 
 Be warm, brief, and helpful.""",
         )
+        logger.info("🤖 VoiceAppointmentAgent initialized")
         self.db = DatabaseManager()
         self.context = ConversationContext()
+        logger.info("✅ Database manager and conversation context ready")
 
     async def _send_tool_call_event(self, context: RunContext, tool_name: str, parameters: Dict, result: str):
         """Send tool call event to frontend for display"""
@@ -77,9 +79,11 @@ Be warm, brief, and helpful.""",
                     json.dumps(event_data).encode('utf-8'),
                     reliable=True
                 )
-                logger.info(f"Sent tool call event: {tool_name}")
+                logger.info(f"📤 Sent tool call event to frontend: {tool_name}")
+            else:
+                logger.warning(f"⚠️  No room context available to send tool call event")
         except Exception as e:
-            logger.error(f"Error sending tool call event: {e}")
+            logger.error(f"❌ Error sending tool call event: {e}", exc_info=True)
 
     @function_tool
     async def identify_user(self, context: RunContext, phone_number: str) -> str:
@@ -88,7 +92,7 @@ Be warm, brief, and helpful.""",
         Args:
             phone_number: The user's phone number for identification
         """
-        logger.info(f"Identifying user with phone: {phone_number}")
+        logger.info(f"🔍 Tool called: identify_user with phone: {phone_number}")
         
         try:
             # Clean phone number
@@ -100,7 +104,7 @@ Be warm, brief, and helpful.""",
                 self.context.user_phone = clean_phone
                 self.context.user_name = user.get('name', 'User')
                 
-                logger.info(f"User identified: {self.context.user_name}")
+                logger.info(f"✅ User identified: {self.context.user_name} (ID: {self.context.user_id})")
                 response = f"Hi {self.context.user_name}! How can I help you today?"
             else:
                 # Create new user
@@ -114,7 +118,7 @@ Be warm, brief, and helpful.""",
                 self.context.user_phone = clean_phone
                 self.context.user_name = 'User'
                 
-                logger.info(f"New user created: {user_id}")
+                logger.info(f"✅ New user created with ID: {user_id}")
                 response = "Welcome! What's your name?"
             
             # Send tool call event to frontend
@@ -122,7 +126,7 @@ Be warm, brief, and helpful.""",
             return response
                 
         except Exception as e:
-            logger.error(f"Error identifying user: {e}")
+            logger.error(f"❌ Error identifying user: {e}", exc_info=True)
             response = "Sorry, I couldn't find that number. Can you try again?"
             return response
 
@@ -133,7 +137,7 @@ Be warm, brief, and helpful.""",
         Args:
             date: Date to check slots for (YYYY-MM-DD format). If not provided, shows next 7 days.
         """
-        logger.info(f"Fetching available slots for date: {date}")
+        logger.info(f"📅 Tool called: fetch_slots for date: {date or 'next 7 days'}")
         
         try:
             # Hard-coded available slots (9 AM to 5 PM, hourly)
@@ -177,7 +181,7 @@ Be warm, brief, and helpful.""",
             return response
                     
         except Exception as e:
-            logger.error(f"Error fetching slots: {e}")
+            logger.error(f"❌ Error fetching slots: {e}", exc_info=True)
             response = "Can't check slots right now. Try again?"
             return response
 
@@ -190,9 +194,10 @@ Be warm, brief, and helpful.""",
             time: Appointment time (HH:MM format)
             purpose: Purpose or reason for the appointment
         """
-        logger.info(f"Booking appointment for {self.context.user_phone}: {date} {time}")
+        logger.info(f"📝 Tool called: book_appointment for {self.context.user_phone}: {date} {time} - {purpose}")
         
         if not self.context.user_id:
+            logger.warning("⚠️  Cannot book appointment: User not identified")
             return "I need your phone number first."
         
         try:
@@ -201,6 +206,7 @@ Be warm, brief, and helpful.""",
             booked_slots = await self.db.get_booked_slots(date)
             
             if datetime_str in booked_slots:
+                logger.warning(f"⚠️  Slot {datetime_str} is already booked")
                 response = f"Sorry, {time} on {date} is taken. Want a different time?"
                 await self._send_tool_call_event(context, "book_appointment", 
                     {"date": date, "time": time, "purpose": purpose}, response)
@@ -227,7 +233,7 @@ Be warm, brief, and helpful.""",
                 'purpose': purpose
             }
             
-            logger.info(f"Appointment booked successfully: {appointment_id}")
+            logger.info(f"✅ Appointment booked successfully: {appointment_id} for user {self.context.user_id}")
             
             formatted_date = datetime.strptime(date, "%Y-%m-%d").strftime("%A, %B %d")
             response = f"Perfect! You're all set for {formatted_date} at {time}. Anything else?"
@@ -237,7 +243,7 @@ Be warm, brief, and helpful.""",
             return response
             
         except Exception as e:
-            logger.error(f"Error booking appointment: {e}")
+            logger.error(f"❌ Error booking appointment: {e}", exc_info=True)
             response = "Sorry, couldn't book that. Try a different time?"
             return response
 
@@ -245,9 +251,10 @@ Be warm, brief, and helpful.""",
     async def retrieve_appointments(self, context: RunContext) -> str:
         """Retrieve all appointments for the identified user.
         """
-        logger.info(f"Retrieving appointments for user: {self.context.user_id}")
+        logger.info(f"📋 Tool called: retrieve_appointments for user: {self.context.user_id}")
         
         if not self.context.user_id:
+            logger.warning("⚠️  Cannot retrieve appointments: User not identified")
             response = "I need to identify you first. Could you please provide your phone number?"
             return response
         
@@ -255,6 +262,7 @@ Be warm, brief, and helpful.""",
             appointments = await self.db.get_user_appointments(self.context.user_id)
             
             if not appointments:
+                logger.info(f"ℹ️  No appointments found for user {self.context.user_id}")
                 response = "You don't have any appointments scheduled. Would you like to book one?"
                 await self._send_tool_call_event(context, "retrieve_appointments", {}, response)
                 return response
@@ -273,6 +281,7 @@ Be warm, brief, and helpful.""",
             response_parts = []
             
             if upcoming:
+                logger.info(f"✅ Found {len(upcoming)} upcoming appointments for user {self.context.user_id}")
                 response_parts.append("Your upcoming appointments:")
                 for apt in upcoming[:3]:  # Limit to 3 for brevity
                     formatted_date = apt['datetime'].strftime("%A, %B %d at %I:%M %p")
@@ -285,7 +294,7 @@ Be warm, brief, and helpful.""",
             return response
             
         except Exception as e:
-            logger.error(f"Error retrieving appointments: {e}")
+            logger.error(f"❌ Error retrieving appointments: {e}", exc_info=True)
             response = "I'm having trouble accessing your appointments right now. Please try again in a moment."
             return response
 
@@ -298,9 +307,10 @@ Be warm, brief, and helpful.""",
             date: Appointment date (YYYY-MM-DD format) 
             time: Appointment time (HH:MM format)
         """
-        logger.info(f"Cancelling appointment: ID={appointment_id}, date={date}, time={time}")
+        logger.info(f"❌ Tool called: cancel_appointment - ID={appointment_id}, date={date}, time={time}")
         
         if not self.context.user_id:
+            logger.warning("⚠️  Cannot cancel appointment: User not identified")
             response = "I need to identify you first. Could you please provide your phone number?"
             return response
         
@@ -331,7 +341,7 @@ Be warm, brief, and helpful.""",
             await self.db.update_appointment_status(appointment['_id'], 'cancelled')
             
             formatted_date = appointment['datetime'].strftime("%A, %B %d at %I:%M %p")
-            logger.info(f"Appointment cancelled: {appointment['_id']}")
+            logger.info(f"✅ Appointment cancelled successfully: {appointment['_id']}")
             
             response = f"I've cancelled your appointment on {formatted_date}. Anything else?"
             await self._send_tool_call_event(context, "cancel_appointment", 
@@ -339,7 +349,7 @@ Be warm, brief, and helpful.""",
             return response
             
         except Exception as e:
-            logger.error(f"Error cancelling appointment: {e}")
+            logger.error(f"❌ Error cancelling appointment: {e}", exc_info=True)
             response = "I'm sorry, I couldn't cancel that appointment right now. Please try again."
             return response
 
@@ -353,9 +363,10 @@ Be warm, brief, and helpful.""",
             new_time: New time (HH:MM format)  
             new_purpose: New purpose for the appointment
         """
-        logger.info(f"Modifying appointment {appointment_id}")
+        logger.info(f"✏️  Tool called: modify_appointment - ID={appointment_id}, new_date={new_date}, new_time={new_time}, new_purpose={new_purpose}")
         
         if not self.context.user_id:
+            logger.warning("⚠️  Cannot modify appointment: User not identified")
             response = "I need to identify you first. Could you please provide your phone number?"
             return response
         
@@ -401,6 +412,8 @@ Be warm, brief, and helpful.""",
             # Update the appointment
             await self.db.update_appointment(appointment['_id'], updates)
             
+            logger.info(f"✅ Appointment modified successfully: {appointment['_id']}")
+            
             if 'datetime' in updates:
                 new_date_formatted = updates['datetime'].strftime("%A, %B %d at %I:%M %p")
                 response = f"Updated! Your appointment is now {new_date_formatted}."
@@ -412,7 +425,7 @@ Be warm, brief, and helpful.""",
             return response
             
         except Exception as e:
-            logger.error(f"Error modifying appointment: {e}")
+            logger.error(f"❌ Error modifying appointment: {e}", exc_info=True)
             response = "I'm sorry, I couldn't modify that appointment right now. Please try again."
             return response
 
@@ -420,7 +433,7 @@ Be warm, brief, and helpful.""",
     async def end_conversation(self, context: RunContext) -> str:
         """End the conversation and generate a summary.
         """
-        logger.info("Ending conversation and generating summary")
+        logger.info("👋 Tool called: end_conversation - Generating summary")
         
         try:
             # Generate conversation summary
@@ -451,8 +464,9 @@ Be warm, brief, and helpful.""",
             # Save summary to database
             if self.context.user_id:
                 await self.db.save_conversation_summary(summary_data)
-            
-            logger.info("Conversation summary saved")
+                logger.info(f"✅ Conversation summary saved for user {self.context.user_id}")
+            else:
+                logger.warning("⚠️  No user ID available, skipping summary save")
             
             # Send summary to frontend
             import json
@@ -471,6 +485,6 @@ Be warm, brief, and helpful.""",
             return response
             
         except Exception as e:
-            logger.error(f"Error ending conversation: {e}")
+            logger.error(f"❌ Error ending conversation: {e}", exc_info=True)
             response = "Thank you for using our appointment booking service! Have a great day!"
             return response
