@@ -4,6 +4,7 @@ from typing import Optional
 class SessionRequest(BaseModel):
     """Request to create a new session - backend generates everything"""
     participantName: Optional[str] = None  # Optional, backend can generate
+    useAvatar: Optional[bool] = True
 
 class SessionResponse(BaseModel):
     """Complete session info for frontend to join"""

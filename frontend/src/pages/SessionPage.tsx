@@ -14,7 +14,7 @@ import { ROUTES, APP_CONSTANTS } from '../config/constants';
 function SessionPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { token, url, roomName } = location.state || {};
+  const { token, url, roomName, useAvatar } = location.state || {};
 
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [conversationSummary, setConversationSummary] = useState<ConversationSummaryData | null>(null);
@@ -105,7 +105,7 @@ function SessionPage() {
           onConversationEnd={handleConversationEnd}
           onEndCall={handleEndCall}
           toolCalls={toolCalls}
-          onDisconnect={handleDisconnect}
+          initialUseAvatar={useAvatar ?? true}
         />
         <RoomAudioRenderer />
       </LiveKitRoom>

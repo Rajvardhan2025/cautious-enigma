@@ -6,6 +6,7 @@ livekit-plugins-openai>=0.6.0
 livekit-plugins-silero>=0.6.0
 livekit-plugins-noise-cancellation>=0.2.0
 livekit-plugins-turn-detector
+livekit-plugins-bey>=0.6.0
 
 # FastAPI and web server
 fastapi>=0.104.0

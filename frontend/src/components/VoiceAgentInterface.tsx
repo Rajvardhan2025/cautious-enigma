@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   useRoomContext,
   useTracks,
-  ControlBar
+  ControlBar,
+  VideoTrack
 } from '@livekit/components-react';
 import {
   RoomEvent,
@@ -21,16 +22,19 @@ interface VoiceAgentInterfaceProps {
   onConversationEnd: (summary: ConversationSummaryData) => void;
   onEndCall: () => void;
   toolCalls: ToolCall[];
-  onDisconnect: () => void;
+  initialUseAvatar: boolean;
 }
 
-function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCalls, onDisconnect }: VoiceAgentInterfaceProps) {
+function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCalls, initialUseAvatar }: VoiceAgentInterfaceProps) {
   const room = useRoomContext();
-  const tracks = useTracks([Track.Source.Microphone, Track.Source.ScreenShare]);
+  const audioTracks = useTracks([Track.Source.Microphone]);
+  const videoTracks = useTracks([Track.Source.Camera]);
 
   const [isAgentConnected, setIsAgentConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [useAvatar, setUseAvatar] = useState(initialUseAvatar);
+  const [isAvatarInitializing, setIsAvatarInitializing] = useState(false);
 
   useEffect(() => {
     if (!room) return;
@@ -96,11 +100,9 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
       room.off(RoomEvent.DataReceived, handleDataReceived);
     };
-  }, [room, onToolCall, onConversationEnd]);
+  }, [room, onToolCall, onConversationEnd, onEndCall]);
 
   useEffect(() => {
-    const audioTracks = tracks.filter(track => track.source === Track.Source.Microphone);
-
     audioTracks.forEach(track => {
       if (track.participant.isLocal) {
         setIsListening(track.publication?.track?.isMuted === false);
@@ -108,20 +110,75 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         setIsSpeaking(track.publication?.track?.isMuted === false);
       }
     });
-  }, [tracks]);
+  }, [audioTracks]);
+
+  const avatarVideoTrack = useAvatar
+    ? videoTracks.find(track => !track.participant.isLocal)
+    : undefined;
+
+  useEffect(() => {
+    if (!useAvatar) {
+      setIsAvatarInitializing(false);
+      return;
+    }
+
+    if (avatarVideoTrack) {
+      setIsAvatarInitializing(false);
+      return;
+    }
+
+    if (isAgentConnected) {
+      setIsAvatarInitializing(true);
+    }
+  }, [useAvatar, avatarVideoTrack, isAgentConnected]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
+        {useAvatar && isAvatarInitializing && !avatarVideoTrack && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-[420px] max-w-[90%] text-center">
+              <div className="text-lg font-semibold text-gray-800">Initializing avatar…</div>
+              <p className="text-sm text-gray-600 mt-2">
+                You can start the conversation now and enable the avatar later.
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setUseAvatar(false)}
+                  className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium"
+                >
+                  Continue without avatar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarInitializing(false)}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                >
+                  Keep waiting
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Main Area - Avatar & Status */}
         <div className="flex-1 flex items-center justify-center p-8 pb-32">
-          <AvatarDisplay
-            isListening={isListening}
-            isSpeaking={isSpeaking}
-            isConnected={isAgentConnected}
-          />
+          {avatarVideoTrack ? (
+            <div className="w-[420px] h-[420px] rounded-3xl overflow-hidden shadow-2xl border border-white/60 bg-black">
+              <VideoTrack
+                trackRef={avatarVideoTrack}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <AvatarDisplay
+              isListening={isListening}
+              isSpeaking={isSpeaking}
+              isConnected={isAgentConnected}
+            />
+          )}
         </div>
 
         {/* Floating Chat Panel */}
