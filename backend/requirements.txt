@@ -1,0 +1,29 @@
+# LiveKit Agents and plugins
+livekit-agents[deepgram,gemini,openai]>=0.8.0
+livekit-plugins-deepgram>=0.6.0
+livekit-plugins-google>=0.6.0
+livekit-plugins-openai>=0.6.0
+livekit-plugins-silero>=0.6.0
+livekit-plugins-noise-cancellation>=0.2.0
+livekit-plugins-turn-detector
+
+# FastAPI and web server
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+
+# Database
+motor>=3.3.0
+pymongo>=4.6.0
+
+# Authentication and tokens
+PyJWT>=2.8.0
+python-jose[cryptography]>=3.3.0
+
+# Utilities
+python-dotenv>=1.0.0
+dateparser>=1.2.0
+pydantic>=2.5.0
+
+# Logging and monitoring
+structlog>=23.2.0
