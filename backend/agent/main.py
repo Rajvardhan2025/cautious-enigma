@@ -119,10 +119,30 @@ async def voice_appointment_agent(ctx: JobContext):
             # Use Deepgram for STT
             stt=deepgram.STT(
                 model="nova-3",
-                language="en",
-                smart_format=True,
+                language="en-US",
+                detect_language=False,
                 interim_results=True,
-                endpointing_ms=400,  # Increased from 10ms to reduce false triggers
+                punctuate=True,
+                smart_format=True,
+                numerals=True,
+                no_delay=True,
+                filler_words=False,
+                vad_events=True,
+                endpointing_ms=100,  # Balance responsiveness with fewer false turn ends
+                keyterms=[
+                    "appointment",
+                    "book",
+                    "booking",
+                    "reschedule",
+                    "cancel",
+                    "phone number",
+                    "tomorrow",
+                    "12 PM",
+                    "3 PM",
+                    "5 PM",
+                    "6 PM",
+                    "7 PM",
+                ],
             ),
             # Use configured LLM (Gemini, Cerebras, or OpenAI)
             llm=get_llm_instance(),
