@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import {
   useRoomContext,
   useConnectionState,
-  useTracks
+  useTracks,
+  useLocalParticipant,
+  ControlBar,
+  useMaybeRoomContext
 } from '@livekit/components-react';
 import {
   RoomEvent,
@@ -10,7 +13,6 @@ import {
   Participant
 } from 'livekit-client';
 
-import VoiceInterface from './VoiceInterface';
 import AvatarDisplay from './AvatarDisplay';
 import LiveTranscript from './LiveTranscript';
 import ConnectionStatus from './ConnectionStatus';
@@ -110,11 +112,20 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
   }, [tracks]);
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="bg-white shadow-sm border-b p-4">
+    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b px-6 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-gray-800">Voice Assistant</h1>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                <span className="text-white text-xl">🎤</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Voice Assistant</h1>
+                <p className="text-xs text-gray-500">AI-Powered Appointment Booking</p>
+              </div>
+            </div>
             <ConnectionStatus
               connectionState={connectionState}
               isAgentConnected={isAgentConnected}
@@ -122,43 +133,48 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
           </div>
           <button
             onClick={onDisconnect}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+            className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg transition-all hover:shadow-lg font-medium text-sm"
           >
             End Session
           </button>
         </div>
       </div>
 
-      <div className="flex-1 flex">
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 flex items-center justify-center p-8">
-            <AvatarDisplay
-              isListening={isListening}
-              isSpeaking={isSpeaking}
-              isConnected={isAgentConnected}
-            />
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Main Area - Avatar & Status */}
+        <div className="flex-1 flex items-center justify-center p-8 pb-32">
+          <AvatarDisplay
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            isConnected={isAgentConnected}
+          />
+        </div>
+
+        {/* Floating Chat Panel */}
+        <div className="absolute right-6 top-6 bottom-6 w-96 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-4 flex-shrink-0">
+            <h2 className="text-sm font-semibold text-white">Live Conversation</h2>
+            <p className="text-xs text-blue-100 mt-0.5">Real-time transcript</p>
           </div>
 
-          <div className="p-6 bg-white border-t">
-            <VoiceInterface
-              isListening={isListening}
-              isSpeaking={isSpeaking}
-              isConnected={isAgentConnected}
-              transcript={transcript}
-            />
+          <div className="flex-1 overflow-hidden bg-gradient-to-b from-gray-50 to-white">
+            <LiveTranscript className="h-full" />
           </div>
         </div>
 
-        <div className="w-96 bg-white border-l flex flex-col">
-          <div className="border-b">
-            <div className="p-4">
-              <h2 className="text-lg font-semibold text-gray-800">Transcript</h2>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            <LiveTranscript className="h-full" />
-          </div>
+        {/* Floating Control Bar */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20" style={{ marginRight: '200px' }}>
+          <ControlBar 
+            variation="minimal"
+            controls={{
+              microphone: true,
+              camera: false,
+              screenShare: false,
+              chat: false,
+              leave: false
+            }}
+          />
         </div>
       </div>
     </div>

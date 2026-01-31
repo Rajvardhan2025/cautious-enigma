@@ -162,18 +162,27 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
         return room?.localParticipant?.identity === fromIdentity;
     };
 
+    // Auto-scroll effect
+    useEffect(() => {
+        const scrollContainer = document.getElementById('transcript-scroll');
+        if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+    }, [allMessages]);
+
     if (allMessages.length === 0) {
         return (
             <div className={`flex flex-col items-center justify-center h-full text-gray-400 ${className}`}>
                 <MessageCircle className="w-12 h-12 mb-4 opacity-50" />
-                <p className="text-sm">Conversation will appear here...</p>
+                <p className="text-sm font-medium">Waiting for conversation...</p>
+                <p className="text-xs mt-2 text-gray-400">Messages will appear here</p>
             </div>
         );
     }
 
     return (
         <div className={`flex flex-col h-full ${className}`}>
-            <div className="flex-1 overflow-y-auto space-y-4 p-4">
+            <div id="transcript-scroll" className="flex-1 overflow-y-auto space-y-3 p-5 scrollbar-thin">
                 {allMessages.map((msg, index) => {
                     const isLocal = isLocalMessage(msg.from.identity);
                     const displayName = msg.from?.name || msg.from.identity || 'Unknown';
@@ -184,43 +193,36 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
                     return (
                         <div
                             key={msg.id || index}
-                            className={`flex gap-3 ${isLocal ? 'justify-end' : 'justify-start'}`}
+                            className={`flex gap-2 ${isLocal ? 'justify-end' : 'justify-start'} animate-fadeIn`}
                         >
                             {!isLocal && (
                                 <div
-                                    className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold`}
+                                    className={`w-7 h-7 rounded-full ${avatarColor} flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold shadow-sm`}
                                     title={displayName}
                                 >
                                     {initials}
                                 </div>
                             )}
 
-                            <div className={`flex flex-col ${isLocal ? 'items-end' : 'items-start'}`}>
-                                {!isLocal && (
-                                    <div className="text-xs text-gray-500 mb-1 px-2">
-                                        {displayName}
-                                    </div>
-                                )}
-
+                            <div className={`flex flex-col ${isLocal ? 'items-end' : 'items-start'} max-w-[75%]`}>
                                 <div
-                                    className={`px-3 py-2 rounded-lg text-sm max-w-xs break-words ${isLocal
-                                        ? 'bg-blue-500 text-white rounded-br-none'
-                                        : 'bg-gray-200 text-gray-900 rounded-bl-none'
+                                    className={`px-3 py-2 rounded-2xl text-sm break-words shadow-sm ${isLocal
+                                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-sm'
+                                        : 'bg-white text-gray-900 rounded-bl-sm border border-gray-100'
                                         } ${isTranscription && !msg.isFinal ? 'opacity-60 italic' : ''
                                         }`}
                                 >
                                     {msg.message}
                                 </div>
 
-                                <div className="text-xs text-gray-400 mt-1 px-2">
+                                <div className="text-[10px] text-gray-400 mt-1 px-1">
                                     {formatTime(msg.timestamp)}
-                                    {isTranscription && !msg.isFinal && ' (interim)'}
                                 </div>
                             </div>
 
                             {isLocal && (
                                 <div
-                                    className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold`}
+                                    className={`w-7 h-7 rounded-full ${avatarColor} flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold shadow-sm`}
                                     title={displayName}
                                 >
                                     {initials}

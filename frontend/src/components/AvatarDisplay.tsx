@@ -72,8 +72,8 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ isListening, isSpeaking, 
     1 + Math.sin(animationFrame * 0.3) * 0.1 : 1;
 
   return (
-    <div className="flex flex-col items-center space-y-6">
-      <div className={`relative p-8 rounded-full border-4 transition-all duration-300 ${styles.container}`}>
+    <div className="flex flex-col items-center space-y-8">
+      <div className={`relative p-6 rounded-full border-4 transition-all duration-300 ${styles.container} shadow-lg`}>
         <div 
           className={`absolute inset-0 rounded-full transition-all duration-300 ${styles.glow}`}
           style={{
@@ -86,15 +86,15 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ isListening, isSpeaking, 
         />
         
         <div 
-          className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all duration-200 ${styles.avatar}`}
+          className={`relative w-40 h-40 rounded-full flex items-center justify-center transition-all duration-200 ${styles.avatar}`}
           style={{
             transform: `scale(${speakingScale})`
           }}
         >
           {state === 'connecting' ? (
-            <Loader className="w-16 h-16 animate-spin" />
+            <Loader className="w-20 h-20 animate-spin" />
           ) : (
-            <User className="w-16 h-16" />
+            <User className="w-20 h-20" />
           )}
         </div>
 
@@ -106,17 +106,14 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ isListening, isSpeaking, 
         )}
 
         {isListening && (
-          <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-            <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+          <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+            <div className="w-4 h-4 bg-white rounded-full animate-pulse" />
           </div>
         )}
       </div>
 
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Voice Assistant
-        </h2>
-        <p className={`text-lg font-medium ${
+        <p className={`text-2xl font-bold mb-1 ${
           state === 'connecting' ? 'text-yellow-600' :
           state === 'speaking' ? 'text-blue-600' :
           state === 'listening' ? 'text-green-600' :
@@ -125,24 +122,13 @@ const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ isListening, isSpeaking, 
           {state === 'connecting' && 'Connecting...'}
           {state === 'speaking' && 'Speaking'}
           {state === 'listening' && 'Listening'}
-          {state === 'idle' && 'Ready'}
+          {state === 'idle' && 'Ready to Help'}
         </p>
-      </div>
-
-      <div className="text-center text-sm text-gray-500 max-w-md">
-        <p>
-          This is where the Beyond Presence or Tavus avatar will be displayed.
-          The avatar will sync with the voice output for a more engaging experience.
-        </p>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
-        <h3 className="text-sm font-semibold text-blue-800 mb-2">Avatar Integration</h3>
-        <p className="text-xs text-blue-700">
-          To enable avatar display:
-          <br />• Configure Beyond Presence or Tavus API keys
-          <br />• Replace this component with avatar video stream
-          <br />• Sync avatar speech with TTS output
+        <p className="text-sm text-gray-500">
+          {state === 'connecting' && 'Establishing connection'}
+          {state === 'speaking' && 'AI is responding'}
+          {state === 'listening' && 'Waiting for your input'}
+          {state === 'idle' && 'Start speaking to begin'}
         </p>
       </div>
     </div>
