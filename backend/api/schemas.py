@@ -1,5 +1,6 @@
-from typing import Optional
 from pydantic import BaseModel
+
+# Only token schemas are used - agent handles all user/appointment operations through tools
 
 class TokenRequest(BaseModel):
     roomName: str
@@ -8,20 +9,3 @@ class TokenRequest(BaseModel):
 class TokenResponse(BaseModel):
     token: str
     url: str
-
-class UserCreate(BaseModel):
-    phone: str
-    name: str
-    email: Optional[str] = None
-
-class AppointmentCreate(BaseModel):
-    user_phone: str
-    date: str
-    time: str
-    purpose: str = "General consultation"
-
-class AppointmentUpdate(BaseModel):
-    date: Optional[str] = None
-    time: Optional[str] = None
-    purpose: Optional[str] = None
-    status: Optional[str] = None

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from core.database import DatabaseManager
-from api.routers import system, users, appointments
+from api.routers import system
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,8 +31,6 @@ db = DatabaseManager()
 
 # Include Routers
 app.include_router(system.router)
-app.include_router(users.router)
-app.include_router(appointments.router)
 
 # Startup event
 @app.on_event("startup")
