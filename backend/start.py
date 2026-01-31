@@ -15,27 +15,33 @@ from pathlib import Path
 def run_agent(mode="dev"):
     """Run the LiveKit agent"""
     print(f"🤖 Starting LiveKit Agent in {mode} mode...")
-    cmd = [sys.executable, "-m", "agent.main", mode]
+    cmd = [sys.executable, "-u", "-m", "agent.main", mode]
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
     return subprocess.Popen(
         cmd, 
         cwd=Path(__file__).parent,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1,
+        env=env
     )
 
 def run_api():
     """Run the FastAPI server"""
     print("🚀 Starting FastAPI server...")
-    cmd = [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    cmd = [sys.executable, "-u", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
     return subprocess.Popen(
         cmd, 
         cwd=Path(__file__).parent,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1,
+        env=env
     )
 
 def run_both(agent_mode="dev"):
@@ -51,42 +57,56 @@ def run_both(agent_mode="dev"):
         
         # Wait a moment for API to start
         import time
-        time.sleep(2)
+        time.sleep(1)
         
         # Start agent
         agent_process = run_agent(agent_mode)
         processes.append(("Agent", agent_process))
         
-        print("✅ Both services started successfully!")
+        print("✅ Both services started!")
         print("📡 API Server: http://localhost:8000")
         print("🤖 Agent: Running in LiveKit Cloud")
         print("📖 API Docs: http://localhost:8000/docs")
-        print("\nPress Ctrl+C to stop all services...")
+        print("\n" + "="*60)
+        print("Logs from both services (press Ctrl+C to stop):")
+        print("="*60 + "\n")
         
-        # Monitor processes and show output
+        # Monitor processes and show output in real-time
         import select
         while True:
             for name, process in processes:
+                # Check if process has exited
                 if process.poll() is not None:
                     print(f"\n❌ {name} process exited with code {process.returncode}")
-                    # Show last output
+                    # Read any remaining output
                     if process.stdout:
-                        output = process.stdout.read()
-                        if output:
-                            print(f"Last output from {name}:")
-                            print(output)
+                        remaining = process.stdout.read()
+                        if remaining:
+                            for line in remaining.splitlines():
+                                print(f"[{name}] {line}")
                     raise RuntimeError(f"{name} process crashed")
                 
-                # Read and display output
+                # Read and display output (non-blocking)
                 if process.stdout:
                     try:
-                        line = process.stdout.readline()
-                        if line:
-                            print(f"[{name}] {line.rstrip()}")
-                    except:
+                        # Use select on Unix systems for non-blocking read
+                        import sys
+                        if sys.platform != 'win32':
+                            import select
+                            ready, _, _ = select.select([process.stdout], [], [], 0)
+                            if ready:
+                                line = process.stdout.readline()
+                                if line:
+                                    print(f"[{name}] {line.rstrip()}", flush=True)
+                        else:
+                            # Windows fallback
+                            line = process.stdout.readline()
+                            if line:
+                                print(f"[{name}] {line.rstrip()}", flush=True)
+                    except Exception as e:
                         pass
             
-            time.sleep(0.1)
+            time.sleep(0.05)  # Reduced sleep for more responsive output
             
     except KeyboardInterrupt:
         print("\n🛑 Stopping services...")
@@ -190,46 +210,50 @@ def main():
     if args.command == "agent":
         process = run_agent(args.mode)
         try:
-            # Monitor for early crashes
-            import time
-            time.sleep(3)
-            if process.poll() is not None:
-                print(f"\n❌ Agent crashed with exit code {process.returncode}")
-                if process.stdout:
-                    output = process.stdout.read()
-                    if output:
-                        print("Error output:")
-                        print(output)
-                return 1
+            print("✅ Agent starting... (logs below)\n")
+            # Stream output in real-time
+            for line in iter(process.stdout.readline, ''):
+                if not line:
+                    break
+                print(line.rstrip())
             
-            print("✅ Agent started successfully")
-            process.wait()
+            # Wait for process to complete
+            return_code = process.wait()
+            if return_code != 0:
+                print(f"\n❌ Agent exited with code {return_code}")
+                return 1
         except KeyboardInterrupt:
             print("\n🛑 Stopping agent...")
             process.terminate()
-            process.wait()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
     
     elif args.command == "api":
         process = run_api()
         try:
-            # Monitor for early crashes
-            import time
-            time.sleep(3)
-            if process.poll() is not None:
-                print(f"\n❌ API server crashed with exit code {process.returncode}")
-                if process.stdout:
-                    output = process.stdout.read()
-                    if output:
-                        print("Error output:")
-                        print(output)
-                return 1
+            print("✅ API server starting... (logs below)\n")
+            # Stream output in real-time
+            for line in iter(process.stdout.readline, ''):
+                if not line:
+                    break
+                print(line.rstrip())
             
-            print("✅ API server started successfully")
-            process.wait()
+            # Wait for process to complete
+            return_code = process.wait()
+            if return_code != 0:
+                print(f"\n❌ API server exited with code {return_code}")
+                return 1
         except KeyboardInterrupt:
             print("\n🛑 Stopping API server...")
             process.terminate()
-            process.wait()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
     
     elif args.command == "both":
         run_both(args.mode)

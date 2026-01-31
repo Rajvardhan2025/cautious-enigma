@@ -53,7 +53,7 @@ class DatabaseManager:
             # Conversation summary indexes
             await self.db.conversation_summaries.create_index([("user_id", 1), ("conversation_date", -1)])
             
-            logger.info("Database indexes created successfully")
+            logger.debug("Database indexes verified")
             
         except Exception as e:
             logger.error(f"Error creating indexes: {e}")
@@ -70,7 +70,7 @@ class DatabaseManager:
         
         try:
             result = await self.db.users.insert_one(user_data)
-            logger.info(f"Created user: {result.inserted_id}")
+            logger.debug(f"Created user: {result.inserted_id}")
             return result.inserted_id
             
         except Exception as e:
@@ -123,7 +123,7 @@ class DatabaseManager:
         
         try:
             result = await self.db.appointments.insert_one(appointment_data)
-            logger.info(f"Created appointment: {result.inserted_id}")
+            logger.debug(f"Created appointment: {result.inserted_id}")
             return result.inserted_id
             
         except Exception as e:
@@ -234,7 +234,7 @@ class DatabaseManager:
         
         try:
             result = await self.db.conversation_summaries.insert_one(summary_data)
-            logger.info(f"Saved conversation summary: {result.inserted_id}")
+            logger.debug(f"Saved conversation summary: {result.inserted_id}")
             return result.inserted_id
             
         except Exception as e:

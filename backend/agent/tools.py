@@ -55,10 +55,10 @@ When booking:
 
 Be warm, brief, and helpful.""",
         )
-        logger.info("🤖 VoiceAppointmentAgent initialized")
+        logger.debug("🤖 VoiceAppointmentAgent initialized")
         self.db = DatabaseManager()
         self.context = ConversationContext()
-        logger.info("✅ Database manager and conversation context ready")
+        logger.debug("✅ Database manager and conversation context ready")
 
     async def _send_tool_call_event(self, context: RunContext, tool_name: str, parameters: Dict, result: str):
         """Send tool call event to frontend for display"""
@@ -79,7 +79,7 @@ Be warm, brief, and helpful.""",
                     json.dumps(event_data).encode('utf-8'),
                     reliable=True
                 )
-                logger.info(f"📤 Sent tool call event to frontend: {tool_name}")
+                logger.debug(f"📤 Sent tool call event to frontend: {tool_name}")
             else:
                 logger.warning(f"⚠️  No room context available to send tool call event")
         except Exception as e:
@@ -92,7 +92,7 @@ Be warm, brief, and helpful.""",
         Args:
             phone_number: The user's phone number for identification
         """
-        logger.info(f"🔍 Tool called: identify_user with phone: {phone_number}")
+        logger.info(f"🔍 identify_user: {phone_number}")
         
         try:
             # Clean phone number
@@ -104,7 +104,7 @@ Be warm, brief, and helpful.""",
                 self.context.user_phone = clean_phone
                 self.context.user_name = user.get('name', 'User')
                 
-                logger.info(f"✅ User identified: {self.context.user_name} (ID: {self.context.user_id})")
+                logger.info(f"✅ User found: {self.context.user_name}")
                 response = f"Hi {self.context.user_name}! How can I help you today?"
             else:
                 # Create new user
@@ -118,7 +118,7 @@ Be warm, brief, and helpful.""",
                 self.context.user_phone = clean_phone
                 self.context.user_name = 'User'
                 
-                logger.info(f"✅ New user created with ID: {user_id}")
+                logger.info(f"✅ New user created")
                 response = "Welcome! What's your name?"
             
             # Send tool call event to frontend
@@ -137,7 +137,7 @@ Be warm, brief, and helpful.""",
         Args:
             date: Date to check slots for (YYYY-MM-DD format). If not provided, shows next 7 days.
         """
-        logger.info(f"📅 Tool called: fetch_slots for date: {date or 'next 7 days'}")
+        logger.info(f"📅 fetch_slots: {date or 'next 7 days'}")
         
         try:
             # Hard-coded available slots (9 AM to 5 PM, hourly)
@@ -194,7 +194,7 @@ Be warm, brief, and helpful.""",
             time: Appointment time (HH:MM format)
             purpose: Purpose or reason for the appointment
         """
-        logger.info(f"📝 Tool called: book_appointment for {self.context.user_phone}: {date} {time} - {purpose}")
+        logger.info(f"📝 book_appointment: {date} {time}")
         
         if not self.context.user_id:
             logger.warning("⚠️  Cannot book appointment: User not identified")
@@ -233,7 +233,7 @@ Be warm, brief, and helpful.""",
                 'purpose': purpose
             }
             
-            logger.info(f"✅ Appointment booked successfully: {appointment_id} for user {self.context.user_id}")
+            logger.info(f"✅ Appointment booked: {date} {time}")
             
             formatted_date = datetime.strptime(date, "%Y-%m-%d").strftime("%A, %B %d")
             response = f"Perfect! You're all set for {formatted_date} at {time}. Anything else?"
@@ -251,7 +251,7 @@ Be warm, brief, and helpful.""",
     async def retrieve_appointments(self, context: RunContext) -> str:
         """Retrieve all appointments for the identified user.
         """
-        logger.info(f"📋 Tool called: retrieve_appointments for user: {self.context.user_id}")
+        logger.info(f"📋 retrieve_appointments")
         
         if not self.context.user_id:
             logger.warning("⚠️  Cannot retrieve appointments: User not identified")
@@ -262,7 +262,7 @@ Be warm, brief, and helpful.""",
             appointments = await self.db.get_user_appointments(self.context.user_id)
             
             if not appointments:
-                logger.info(f"ℹ️  No appointments found for user {self.context.user_id}")
+                logger.debug(f"ℹ️  No appointments found")
                 response = "You don't have any appointments scheduled. Would you like to book one?"
                 await self._send_tool_call_event(context, "retrieve_appointments", {}, response)
                 return response
@@ -281,7 +281,7 @@ Be warm, brief, and helpful.""",
             response_parts = []
             
             if upcoming:
-                logger.info(f"✅ Found {len(upcoming)} upcoming appointments for user {self.context.user_id}")
+                logger.info(f"✅ Found {len(upcoming)} appointments")
                 response_parts.append("Your upcoming appointments:")
                 for apt in upcoming[:3]:  # Limit to 3 for brevity
                     formatted_date = apt['datetime'].strftime("%A, %B %d at %I:%M %p")
@@ -307,7 +307,7 @@ Be warm, brief, and helpful.""",
             date: Appointment date (YYYY-MM-DD format) 
             time: Appointment time (HH:MM format)
         """
-        logger.info(f"❌ Tool called: cancel_appointment - ID={appointment_id}, date={date}, time={time}")
+        logger.info(f"❌ cancel_appointment: {appointment_id or f'{date} {time}'}")
         
         if not self.context.user_id:
             logger.warning("⚠️  Cannot cancel appointment: User not identified")
@@ -341,7 +341,7 @@ Be warm, brief, and helpful.""",
             await self.db.update_appointment_status(appointment['_id'], 'cancelled')
             
             formatted_date = appointment['datetime'].strftime("%A, %B %d at %I:%M %p")
-            logger.info(f"✅ Appointment cancelled successfully: {appointment['_id']}")
+            logger.info(f"✅ Appointment cancelled")
             
             response = f"I've cancelled your appointment on {formatted_date}. Anything else?"
             await self._send_tool_call_event(context, "cancel_appointment", 
@@ -363,7 +363,7 @@ Be warm, brief, and helpful.""",
             new_time: New time (HH:MM format)  
             new_purpose: New purpose for the appointment
         """
-        logger.info(f"✏️  Tool called: modify_appointment - ID={appointment_id}, new_date={new_date}, new_time={new_time}, new_purpose={new_purpose}")
+        logger.info(f"✏️  modify_appointment: {appointment_id}")
         
         if not self.context.user_id:
             logger.warning("⚠️  Cannot modify appointment: User not identified")
@@ -412,7 +412,7 @@ Be warm, brief, and helpful.""",
             # Update the appointment
             await self.db.update_appointment(appointment['_id'], updates)
             
-            logger.info(f"✅ Appointment modified successfully: {appointment['_id']}")
+            logger.info(f"✅ Appointment modified")
             
             if 'datetime' in updates:
                 new_date_formatted = updates['datetime'].strftime("%A, %B %d at %I:%M %p")
@@ -433,7 +433,7 @@ Be warm, brief, and helpful.""",
     async def end_conversation(self, context: RunContext) -> str:
         """End the conversation and generate a summary.
         """
-        logger.info("👋 Tool called: end_conversation - Generating summary")
+        logger.info("👋 end_conversation")
         
         try:
             # Generate conversation summary
@@ -464,7 +464,7 @@ Be warm, brief, and helpful.""",
             # Save summary to database
             if self.context.user_id:
                 await self.db.save_conversation_summary(summary_data)
-                logger.info(f"✅ Conversation summary saved for user {self.context.user_id}")
+                logger.debug(f"✅ Conversation summary saved")
             else:
                 logger.warning("⚠️  No user ID available, skipping summary save")
             

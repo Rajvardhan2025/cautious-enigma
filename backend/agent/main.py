@@ -16,8 +16,23 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from agent.tools import VoiceAppointmentAgent
 
+# Configure logging - only show important messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%H:%M:%S'
+)
+
+# Silence noisy loggers
+logging.getLogger("pymongo").setLevel(logging.WARNING)
+logging.getLogger("pymongo.connection").setLevel(logging.WARNING)
+logging.getLogger("pymongo.command").setLevel(logging.WARNING)
+logging.getLogger("pymongo.topology").setLevel(logging.WARNING)
+logging.getLogger("pymongo.serverSelection").setLevel(logging.WARNING)
+logging.getLogger("livekit.plugins.turn_detector").setLevel(logging.WARNING)
+logging.getLogger("livekit.plugins.silero").setLevel(logging.WARNING)
+
 logger = logging.getLogger("agent")
-logging.basicConfig(level=logging.INFO)
 
 load_dotenv(".env.local")
 
@@ -122,44 +137,28 @@ async def voice_appointment_agent(ctx: JobContext):
         # Add event listeners for session events
         @session.on("user_speech_committed")
         def on_user_speech(msg):
-            logger.info(f"🎤 User said: {msg.text}")
+            logger.info(f"🎤 User: {msg.text}")
         
         @session.on("agent_speech_committed")
         def on_agent_speech(msg):
-            logger.info(f"🗣️  Agent said: {msg.text}")
+            logger.info(f"🗣️  Agent: {msg.text}")
         
         @session.on("agent_speech_interrupted")
         def on_agent_interrupted(msg):
-            logger.info(f"⚠️  Agent speech interrupted: {msg.text}")
+            logger.warning(f"⚠️  Interrupted: {msg.text[:50]}...")
         
         @session.on("function_calls_collected")
         def on_function_calls(calls):
             for call in calls:
-                logger.info(f"🔧 Tool called: {call.function_info.name} with args: {call.arguments}")
+                logger.info(f"🔧 Calling tool: {call.function_info.name}")
         
         @session.on("function_calls_finished")
         def on_function_finished(calls):
             for call in calls:
                 if call.exception:
-                    logger.error(f"❌ Tool {call.function_info.name} failed: {call.exception}")
+                    logger.error(f"❌ Tool failed: {call.function_info.name} - {call.exception}")
                 else:
-                    logger.info(f"✅ Tool {call.function_info.name} completed successfully")
-        
-        @session.on("user_started_speaking")
-        def on_user_started():
-            logger.debug("🎙️  User started speaking")
-        
-        @session.on("user_stopped_speaking")
-        def on_user_stopped():
-            logger.debug("🔇 User stopped speaking")
-        
-        @session.on("agent_started_speaking")
-        def on_agent_started():
-            logger.debug("🔊 Agent started speaking")
-        
-        @session.on("agent_stopped_speaking")
-        def on_agent_stopped():
-            logger.debug("🔇 Agent stopped speaking")
+                    logger.info(f"✅ Tool completed: {call.function_info.name}")
         
         logger.info("🚀 Starting agent session")
         await session.start(
