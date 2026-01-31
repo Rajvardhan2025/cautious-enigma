@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LiveKitRoom, 
+import {
+  LiveKitRoom,
   RoomAudioRenderer
 } from '@livekit/components-react';
 import '@livekit/components-styles';
@@ -14,7 +14,7 @@ import { ROUTES, APP_CONSTANTS } from '../config/constants';
 function SessionPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { token, url, roomName, participantName } = location.state || {};
+  const { token, url, roomName } = location.state || {};
 
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [conversationSummary, setConversationSummary] = useState<ConversationSummaryData | null>(null);

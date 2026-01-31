@@ -14,23 +14,23 @@ interface VoiceInterfaceProps {
   transcript: TranscriptItem[];
 }
 
-const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ 
-  isListening, 
-  isSpeaking, 
-  isConnected, 
-  transcript 
+const VoiceInterface: React.FC<VoiceInterfaceProps> = ({
+  isListening,
+  isSpeaking,
+  isConnected,
+  transcript
 }) => {
-  const [audioLevel, setAudioLevel] = useState(0);
   const [lastTranscript, setLastTranscript] = useState('');
 
   useEffect(() => {
+    // Audio level visualization placeholder - can be implemented later
     if (isListening || isSpeaking) {
-      const interval = setInterval(() => {
-        setAudioLevel(Math.random() * 100);
-      }, 100);
-      return () => clearInterval(interval);
+      // const interval = setInterval(() => {
+      //   setAudioLevel(Math.random() * 100);
+      // }, 100);
+      // return () => clearInterval(interval);
     } else {
-      setAudioLevel(0);
+      // setAudioLevel(0);
     }
   }, [isListening, isSpeaking]);
 
@@ -100,9 +100,8 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({
       </div>
 
       <div className="flex items-center justify-center space-x-2">
-        <div className={`w-3 h-3 rounded-full ${
-          isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-        }`} />
+        <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+          }`} />
         <span className="text-sm text-gray-600">
           {isConnected ? 'Connected' : 'Disconnected'}
         </span>

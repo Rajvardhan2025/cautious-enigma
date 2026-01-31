@@ -114,6 +114,8 @@ async def voice_appointment_agent(ctx: JobContext):
                 if params.participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
                 else noise_cancellation.BVC(),
             ),
+            # Enable text output to send transcriptions to frontend
+            text_output=True,
         ),
     )
     

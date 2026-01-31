@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   useRoomContext,
   useConnectionState,
   useTracks
 } from '@livekit/components-react';
-import { 
-  RoomEvent, 
+import {
+  RoomEvent,
   Track,
   Participant
 } from 'livekit-client';
 
 import VoiceInterface from './VoiceInterface';
 import AvatarDisplay from './AvatarDisplay';
-import ToolCallDisplay from './ToolCallDisplay';
+import LiveTranscript from './LiveTranscript';
 import ConnectionStatus from './ConnectionStatus';
 import { ToolCall, ConversationSummaryData, TranscriptItem } from '../types';
 import { APP_CONSTANTS } from '../config/constants';
@@ -39,8 +39,8 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
 
     const checkForAgent = () => {
       const participants = Array.from(room.remoteParticipants.values());
-      const agentPresent = participants.some(p => 
-        APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword => 
+      const agentPresent = participants.some(p =>
+        APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
           p.identity.toLowerCase().includes(keyword)
         )
       );
@@ -54,7 +54,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
 
     const handleParticipantConnected = (participant: Participant) => {
       console.log('Participant connected:', participant.identity);
-      if (APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword => 
+      if (APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
         participant.identity.toLowerCase().includes(keyword)
       )) {
         setIsAgentConnected(true);
@@ -63,7 +63,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
 
     const handleParticipantDisconnected = (participant: Participant) => {
       console.log('Participant disconnected:', participant.identity);
-      if (APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword => 
+      if (APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
         participant.identity.toLowerCase().includes(keyword)
       )) {
         setIsAgentConnected(false);
@@ -73,7 +73,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
     const handleDataReceived = (payload: Uint8Array) => {
       try {
         const data = JSON.parse(new TextDecoder().decode(payload));
-        
+
         if (data.type === 'tool_call') {
           onToolCall(data);
         } else if (data.type === 'conversation_summary') {
@@ -99,7 +99,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
 
   useEffect(() => {
     const audioTracks = tracks.filter(track => track.source === Track.Source.Microphone);
-    
+
     audioTracks.forEach(track => {
       if (track.participant.isLocal) {
         setIsListening(track.publication?.track?.isMuted === false);
@@ -115,7 +115,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-2xl font-bold text-gray-800">Voice Assistant</h1>
-            <ConnectionStatus 
+            <ConnectionStatus
               connectionState={connectionState}
               isAgentConnected={isAgentConnected}
             />
@@ -132,13 +132,13 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
       <div className="flex-1 flex">
         <div className="flex-1 flex flex-col">
           <div className="flex-1 flex items-center justify-center p-8">
-            <AvatarDisplay 
+            <AvatarDisplay
               isListening={isListening}
               isSpeaking={isSpeaking}
               isConnected={isAgentConnected}
             />
           </div>
-          
+
           <div className="p-6 bg-white border-t">
             <VoiceInterface
               isListening={isListening}
@@ -150,12 +150,14 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, toolCalls, onDisco
         </div>
 
         <div className="w-96 bg-white border-l flex flex-col">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold text-gray-800">Activity</h2>
+          <div className="border-b">
+            <div className="p-4">
+              <h2 className="text-lg font-semibold text-gray-800">Transcript</h2>
+            </div>
           </div>
-          
-          <div className="flex-1 overflow-y-auto">
-            <ToolCallDisplay toolCalls={toolCalls} />
+
+          <div className="flex-1 overflow-hidden">
+            <LiveTranscript className="h-full" />
           </div>
         </div>
       </div>
