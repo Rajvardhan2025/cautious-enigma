@@ -1,5 +1,4 @@
 import logging
-import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from dataclasses import dataclass
@@ -16,41 +15,7 @@ from core.models import Appointment
 logger = logging.getLogger("agent.tools")
 
 
-def sanitize_llm_response(text: str) -> str:
-    """
-    Sanitize LLM responses to remove technical details, function definitions,
-    and other non-conversational content that shouldn't be spoken.
-    
-    Industry standard approach: Remove code blocks, function signatures,
-    technical IDs, and system messages.
-    """
-    # Remove code blocks (```...```)
-    text = re.sub(r'```[\s\S]*?```', '', text)
-    
-    # Remove inline code (`...`)
-    text = re.sub(r'`[^`]+`', '', text)
-    
-    # Remove function definitions and signatures
-    text = re.sub(r'def\s+\w+\([^)]*\):', '', text)
-    text = re.sub(r'async\s+def\s+\w+\([^)]*\):', '', text)
-    
-    # Remove technical IDs (MongoDB ObjectIds, UUIDs)
-    text = re.sub(r'\b[0-9a-f]{24}\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b', '', text, flags=re.IGNORECASE)
-    
-    # Remove JSON-like structures
-    text = re.sub(r'\{[^}]*\}', '', text)
-    text = re.sub(r'\[[^\]]*\]', '', text)
-    
-    # Remove system/debug messages
-    text = re.sub(r'(DEBUG|INFO|ERROR|WARNING):.*', '', text)
-    text = re.sub(r'Traceback.*', '', text)
-    
-    # Remove multiple spaces and clean up
-    text = re.sub(r'\s+', ' ', text)
-    text = text.strip()
-    
-    return text
+
 
 @dataclass
 class ConversationContext:
@@ -154,12 +119,12 @@ Be warm, brief, and helpful.""",
             
             # Send tool call event to frontend
             await self._send_tool_call_event(context, "identify_user", {"phone_number": phone_number}, response)
-            return sanitize_llm_response(response)
+            return response
                 
         except Exception as e:
             logger.error(f"Error identifying user: {e}")
             response = "Sorry, I couldn't find that number. Can you try again?"
-            return sanitize_llm_response(response)
+            return response
 
     @function_tool
     async def fetch_slots(self, context: RunContext, date: str = None) -> str:
@@ -209,12 +174,12 @@ Be warm, brief, and helpful.""",
                     response = "This week is full. Want to check next week?"
             
             await self._send_tool_call_event(context, "fetch_slots", {"date": date}, response)
-            return sanitize_llm_response(response)
+            return response
                     
         except Exception as e:
             logger.error(f"Error fetching slots: {e}")
             response = "Can't check slots right now. Try again?"
-            return sanitize_llm_response(response)
+            return response
 
     @function_tool
     async def book_appointment(self, context: RunContext, date: str, time: str, purpose: str = "General consultation") -> str:
@@ -228,7 +193,7 @@ Be warm, brief, and helpful.""",
         logger.info(f"Booking appointment for {self.context.user_phone}: {date} {time}")
         
         if not self.context.user_id:
-            return sanitize_llm_response("I need your phone number first.")
+            return "I need your phone number first."
         
         try:
             # Check if slot is available
@@ -239,7 +204,7 @@ Be warm, brief, and helpful.""",
                 response = f"Sorry, {time} on {date} is taken. Want a different time?"
                 await self._send_tool_call_event(context, "book_appointment", 
                     {"date": date, "time": time, "purpose": purpose}, response)
-                return sanitize_llm_response(response)
+                return response
             
             # Create appointment
             appointment_data = {
@@ -269,12 +234,12 @@ Be warm, brief, and helpful.""",
             
             await self._send_tool_call_event(context, "book_appointment", 
                 {"date": date, "time": time, "purpose": purpose}, response)
-            return sanitize_llm_response(response)
+            return response
             
         except Exception as e:
             logger.error(f"Error booking appointment: {e}")
             response = "Sorry, couldn't book that. Try a different time?"
-            return sanitize_llm_response(response)
+            return response
 
     @function_tool
     async def retrieve_appointments(self, context: RunContext) -> str:
@@ -284,7 +249,7 @@ Be warm, brief, and helpful.""",
         
         if not self.context.user_id:
             response = "I need to identify you first. Could you please provide your phone number?"
-            return sanitize_llm_response(response)
+            return response
         
         try:
             appointments = await self.db.get_user_appointments(self.context.user_id)
@@ -292,7 +257,7 @@ Be warm, brief, and helpful.""",
             if not appointments:
                 response = "You don't have any appointments scheduled. Would you like to book one?"
                 await self._send_tool_call_event(context, "retrieve_appointments", {}, response)
-                return sanitize_llm_response(response)
+                return response
             
             # Separate upcoming and past appointments
             now = datetime.utcnow()
@@ -317,12 +282,12 @@ Be warm, brief, and helpful.""",
             
             await self._send_tool_call_event(context, "retrieve_appointments", 
                 {"count": len(appointments)}, response)
-            return sanitize_llm_response(response)
+            return response
             
         except Exception as e:
             logger.error(f"Error retrieving appointments: {e}")
             response = "I'm having trouble accessing your appointments right now. Please try again in a moment."
-            return sanitize_llm_response(response)
+            return response
 
     @function_tool
     async def cancel_appointment(self, context: RunContext, appointment_id: str = None, date: str = None, time: str = None) -> str:
@@ -337,7 +302,7 @@ Be warm, brief, and helpful.""",
         
         if not self.context.user_id:
             response = "I need to identify you first. Could you please provide your phone number?"
-            return sanitize_llm_response(response)
+            return response
         
         try:
             appointment = None
@@ -348,19 +313,19 @@ Be warm, brief, and helpful.""",
                 appointment = await self.db.get_appointment_by_datetime(self.context.user_id, date, time)
             else:
                 response = "I need either the appointment ID or the date and time to cancel an appointment."
-                return sanitize_llm_response(response)
+                return response
             
             if not appointment:
                 response = "I couldn't find that appointment. Could you please check the details and try again?"
                 await self._send_tool_call_event(context, "cancel_appointment", 
                     {"appointment_id": appointment_id, "date": date, "time": time}, response)
-                return sanitize_llm_response(response)
+                return response
             
             if appointment['status'] == 'cancelled':
                 response = "That appointment is already cancelled."
                 await self._send_tool_call_event(context, "cancel_appointment", 
                     {"appointment_id": appointment_id, "date": date, "time": time}, response)
-                return sanitize_llm_response(response)
+                return response
             
             # Cancel the appointment
             await self.db.update_appointment_status(appointment['_id'], 'cancelled')
@@ -371,12 +336,12 @@ Be warm, brief, and helpful.""",
             response = f"I've cancelled your appointment on {formatted_date}. Anything else?"
             await self._send_tool_call_event(context, "cancel_appointment", 
                 {"date": date, "time": time}, response)
-            return sanitize_llm_response(response)
+            return response
             
         except Exception as e:
             logger.error(f"Error cancelling appointment: {e}")
             response = "I'm sorry, I couldn't cancel that appointment right now. Please try again."
-            return sanitize_llm_response(response)
+            return response
 
     @function_tool
     async def modify_appointment(self, context: RunContext, appointment_id: str, new_date: str = None, new_time: str = None, new_purpose: str = None) -> str:
@@ -392,7 +357,7 @@ Be warm, brief, and helpful.""",
         
         if not self.context.user_id:
             response = "I need to identify you first. Could you please provide your phone number?"
-            return sanitize_llm_response(response)
+            return response
         
         try:
             appointment = await self.db.get_appointment_by_id(appointment_id, self.context.user_id)
@@ -401,13 +366,13 @@ Be warm, brief, and helpful.""",
                 response = "I couldn't find that appointment. Could you please check the appointment ID?"
                 await self._send_tool_call_event(context, "modify_appointment", 
                     {"appointment_id": appointment_id}, response)
-                return sanitize_llm_response(response)
+                return response
             
             if appointment['status'] == 'cancelled':
                 response = "That appointment is cancelled and cannot be modified. Would you like to book a new one?"
                 await self._send_tool_call_event(context, "modify_appointment", 
                     {"appointment_id": appointment_id}, response)
-                return sanitize_llm_response(response)
+                return response
             
             updates = {}
             
@@ -420,7 +385,7 @@ Be warm, brief, and helpful.""",
                     response = f"Sorry, {new_time} on {new_date} is already booked. Please choose a different time."
                     await self._send_tool_call_event(context, "modify_appointment", 
                         {"appointment_id": appointment_id, "new_date": new_date, "new_time": new_time}, response)
-                    return sanitize_llm_response(response)
+                    return response
                 
                 updates['date'] = new_date
                 updates['time'] = new_time
@@ -431,7 +396,7 @@ Be warm, brief, and helpful.""",
             
             if not updates:
                 response = "What would you like to change about your appointment? The date, time, or purpose?"
-                return sanitize_llm_response(response)
+                return response
             
             # Update the appointment
             await self.db.update_appointment(appointment['_id'], updates)
@@ -444,12 +409,12 @@ Be warm, brief, and helpful.""",
             
             await self._send_tool_call_event(context, "modify_appointment", 
                 {"appointment_id": appointment_id, "updates": updates}, response)
-            return sanitize_llm_response(response)
+            return response
             
         except Exception as e:
             logger.error(f"Error modifying appointment: {e}")
             response = "I'm sorry, I couldn't modify that appointment right now. Please try again."
-            return sanitize_llm_response(response)
+            return response
 
     @function_tool
     async def end_conversation(self, context: RunContext) -> str:
@@ -503,9 +468,9 @@ Be warm, brief, and helpful.""",
                 )
             
             response = "Thank you for using our appointment booking service! Have a great day!"
-            return sanitize_llm_response(response)
+            return response
             
         except Exception as e:
             logger.error(f"Error ending conversation: {e}")
             response = "Thank you for using our appointment booking service! Have a great day!"
-            return sanitize_llm_response(response)
+            return response
