@@ -1,23 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES, FEATURES, APP_CONSTANTS } from '../config/constants';
+import { ROUTES, FEATURES } from '../config/constants';
+import { createSession, handleApiError } from '../lib/api';
 
 function HomePage() {
   const navigate = useNavigate();
-  const [roomName, setRoomName] = useState('');
-  const [userName, setUserName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const generateRoomName = () => `${APP_CONSTANTS.ROOM_PREFIX}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const generateUserName = () => `${APP_CONSTANTS.USER_PREFIX}-${Math.random().toString(36).substr(2, 9)}`;
+  const handleStartSession = async () => {
+    setIsLoading(true);
+    setError(null);
     
-    setRoomName(generateRoomName());
-    setUserName(generateUserName());
-  }, []);
-
-  const handleStartSession = () => {
-    if (roomName && userName) {
-      navigate(ROUTES.SESSION, { state: { roomName, userName } });
+    try {
+      const session = await createSession();
+      navigate(ROUTES.SESSION, { 
+        state: { 
+          token: session.token,
+          url: session.url,
+          roomName: session.roomName,
+          participantName: session.participantName
+        } 
+      });
+    } catch (err) {
+      console.error('Error creating session:', err);
+      setError(handleApiError(err));
+      setIsLoading(false);
     }
   };
 
@@ -30,36 +38,19 @@ function HomePage() {
           Connect to start booking appointments with our AI voice assistant. 
           The assistant can help you book, modify, or cancel appointments through natural conversation.
         </p>
-        
-        <div className="space-y-4 mb-8">
-          <div className="text-left">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Room ID</label>
-            <input
-              type="text"
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter room name"
-            />
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
           </div>
-          <div className="text-left">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-            <input
-              type="text"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your name"
-            />
-          </div>
-        </div>
+        )}
 
         <button
           onClick={handleStartSession}
-          disabled={!roomName || !userName}
+          disabled={isLoading}
           className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
         >
-          Start Voice Session
+          {isLoading ? 'Connecting...' : 'Start Voice Session'}
         </button>
 
         <div className="mt-6 text-sm text-gray-500">

@@ -16,13 +16,27 @@ def run_agent(mode="dev"):
     """Run the LiveKit agent"""
     print(f"🤖 Starting LiveKit Agent in {mode} mode...")
     cmd = [sys.executable, "-m", "agent.main", mode]
-    return subprocess.Popen(cmd, cwd=Path(__file__).parent)
+    return subprocess.Popen(
+        cmd, 
+        cwd=Path(__file__).parent,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
+    )
 
 def run_api():
     """Run the FastAPI server"""
     print("🚀 Starting FastAPI server...")
     cmd = [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-    return subprocess.Popen(cmd, cwd=Path(__file__).parent)
+    return subprocess.Popen(
+        cmd, 
+        cwd=Path(__file__).parent,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
+    )
 
 def run_both(agent_mode="dev"):
     """Run both agent and API server"""
@@ -33,7 +47,7 @@ def run_both(agent_mode="dev"):
     try:
         # Start API server
         api_process = run_api()
-        processes.append(api_process)
+        processes.append(("API", api_process))
         
         # Wait a moment for API to start
         import time
@@ -41,7 +55,7 @@ def run_both(agent_mode="dev"):
         
         # Start agent
         agent_process = run_agent(agent_mode)
-        processes.append(agent_process)
+        processes.append(("Agent", agent_process))
         
         print("✅ Both services started successfully!")
         print("📡 API Server: http://localhost:8000")
@@ -49,23 +63,55 @@ def run_both(agent_mode="dev"):
         print("📖 API Docs: http://localhost:8000/docs")
         print("\nPress Ctrl+C to stop all services...")
         
-        # Wait for processes
-        for process in processes:
-            process.wait()
+        # Monitor processes and show output
+        import select
+        while True:
+            for name, process in processes:
+                if process.poll() is not None:
+                    print(f"\n❌ {name} process exited with code {process.returncode}")
+                    # Show last output
+                    if process.stdout:
+                        output = process.stdout.read()
+                        if output:
+                            print(f"Last output from {name}:")
+                            print(output)
+                    raise RuntimeError(f"{name} process crashed")
+                
+                # Read and display output
+                if process.stdout:
+                    try:
+                        line = process.stdout.readline()
+                        if line:
+                            print(f"[{name}] {line.rstrip()}")
+                    except:
+                        pass
+            
+            time.sleep(0.1)
             
     except KeyboardInterrupt:
         print("\n🛑 Stopping services...")
-        for process in processes:
+        for name, process in processes:
             process.terminate()
         
         # Wait for graceful shutdown
-        for process in processes:
+        for name, process in processes:
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
+                print(f"⚠️  Force killing {name}...")
                 process.kill()
         
         print("✅ All services stopped")
+    except RuntimeError as e:
+        print(f"\n❌ Error: {e}")
+        print("🛑 Stopping remaining services...")
+        for name, process in processes:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
 
 def check_environment():
     """Check if required environment variables are set"""
@@ -144,16 +190,44 @@ def main():
     if args.command == "agent":
         process = run_agent(args.mode)
         try:
+            # Monitor for early crashes
+            import time
+            time.sleep(3)
+            if process.poll() is not None:
+                print(f"\n❌ Agent crashed with exit code {process.returncode}")
+                if process.stdout:
+                    output = process.stdout.read()
+                    if output:
+                        print("Error output:")
+                        print(output)
+                return 1
+            
+            print("✅ Agent started successfully")
             process.wait()
         except KeyboardInterrupt:
+            print("\n🛑 Stopping agent...")
             process.terminate()
             process.wait()
     
     elif args.command == "api":
         process = run_api()
         try:
+            # Monitor for early crashes
+            import time
+            time.sleep(3)
+            if process.poll() is not None:
+                print(f"\n❌ API server crashed with exit code {process.returncode}")
+                if process.stdout:
+                    output = process.stdout.read()
+                    if output:
+                        print("Error output:")
+                        print(output)
+                return 1
+            
+            print("✅ API server started successfully")
             process.wait()
         except KeyboardInterrupt:
+            print("\n🛑 Stopping API server...")
             process.terminate()
             process.wait()
     

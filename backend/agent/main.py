@@ -58,7 +58,7 @@ def prewarm(proc: JobProcess):
 server.setup_fnc = prewarm
 
 
-@server.rtc_session()
+@server.rtc_session(agent_name="voice-appointment-agent")
 async def voice_appointment_agent(ctx: JobContext):
     # Join the room and connect to the user
     await ctx.connect()
@@ -69,6 +69,17 @@ async def voice_appointment_agent(ctx: JobContext):
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
+    
+    # Track if user has left
+    user_left = False
+    
+    @ctx.room.on("participant_disconnected")
+    def on_participant_disconnected(participant: rtc.RemoteParticipant):
+        nonlocal user_left
+        logger.info(f"Participant disconnected: {participant.identity}")
+        # If a human participant leaves, mark for cleanup
+        if not participant.identity.startswith("agent"):
+            user_left = True
 
     # Set up voice AI pipeline with Deepgram and configurable LLM
     session = AgentSession(

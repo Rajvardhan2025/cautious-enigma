@@ -4,9 +4,9 @@
  */
 
 interface AppConfig {
-  // LiveKit Configuration
-  livekit: {
-    tokenUrl: string;
+  // API Configuration
+  api: {
+    baseUrl: string;
   };
   
   // Avatar Configuration
@@ -23,8 +23,8 @@ interface AppConfig {
 }
 
 const config: AppConfig = {
-  livekit: {
-    tokenUrl: import.meta.env.VITE_LIVEKIT_TOKEN_URL || 'http://localhost:8000/api/token',
+  api: {
+    baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
   },
   
   avatar: {
@@ -42,8 +42,8 @@ const config: AppConfig = {
 const validateConfig = () => {
   const errors: string[] = [];
   
-  if (!config.livekit.tokenUrl) {
-    errors.push('VITE_LIVEKIT_TOKEN_URL is required');
+  if (!config.api.baseUrl) {
+    errors.push('VITE_API_BASE_URL is required');
   }
   
   if (errors.length > 0) {
