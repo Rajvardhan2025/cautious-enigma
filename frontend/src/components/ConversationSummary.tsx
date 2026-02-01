@@ -1,14 +1,19 @@
 import React from 'react';
 import { 
-  X, 
   Calendar, 
-  Clock, 
   User, 
   MessageSquare, 
-  CheckCircle,
   Download,
 } from 'lucide-react';
 import { formatDate } from '../lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from './ui/dialog';
 
 interface Appointment {
   date: string;
@@ -28,10 +33,11 @@ interface ConversationSummaryData {
 
 interface ConversationSummaryProps {
   summary: ConversationSummaryData;
+  open: boolean;
   onClose: () => void;
 }
 
-const ConversationSummary: React.FC<ConversationSummaryProps> = ({ summary, onClose }) => {
+const ConversationSummary: React.FC<ConversationSummaryProps> = ({ summary, open, onClose }) => {
   const handleDownload = () => {
     const summaryText = generateSummaryText(summary);
     const blob = new Blob([summaryText], { type: 'text/plain' });
@@ -73,77 +79,44 @@ const ConversationSummary: React.FC<ConversationSummaryProps> = ({ summary, onCl
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <MessageSquare className="w-8 h-8" />
-              <div>
-                <h2 className="text-2xl font-bold">Conversation Summary</h2>
-                <p className="text-blue-100">
-                  {formatDate(new Date(summary.conversation_date))}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden p-0 border-0">
+        <div className="border-b border-gray-200 px-6 py-5">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-medium text-gray-900">
+              Conversation Summary
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-1">
+              {formatDate(new Date(summary.conversation_date))}
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-blue-50 rounded-lg p-4 text-center">
-              <Clock className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-blue-600">
-                {summary.duration_minutes || 'N/A'}
-              </div>
-              <div className="text-sm text-blue-700">Minutes</div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 text-center">
-              <Calendar className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-green-600">
-                {summary.appointments_discussed?.length || 0}
-              </div>
-              <div className="text-sm text-green-700">Appointments</div>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4 text-center">
-              <User className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-purple-600">
-                {summary.user_preferences?.length || 0}
-              </div>
-              <div className="text-sm text-purple-700">Preferences</div>
-            </div>
-          </div>
+        <div className="px-6 py-4 overflow-y-auto max-h-[calc(90vh-200px)] space-y-6">
 
           {summary.appointments_discussed && summary.appointments_discussed.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-                <Calendar className="w-5 h-5 mr-2 text-green-500" />
-                Appointments Discussed
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                Appointments
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {summary.appointments_discussed.map((appointment, index) => (
-                  <div key={index} className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                        <div>
-                          <div className="font-medium text-gray-800">
-                            {appointment.purpose || 'General Consultation'}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {appointment.date} at {appointment.time}
-                          </div>
+                  <div key={index} className="border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {appointment.purpose || 'General Consultation'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {appointment.date} · {appointment.time}
                         </div>
                       </div>
-                      <div className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-                        {appointment.status || 'Booked'}
-                      </div>
+                      {appointment.status && (
+                        <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
+                          {appointment.status}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -152,73 +125,68 @@ const ConversationSummary: React.FC<ConversationSummaryProps> = ({ summary, onCl
           )}
 
           {summary.user_preferences && summary.user_preferences.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-                <User className="w-5 h-5 mr-2 text-purple-500" />
-                User Preferences
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                <User className="w-4 h-4 text-gray-400" />
+                Preferences
               </h3>
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <div className="flex flex-wrap gap-2">
-                  {summary.user_preferences.map((preference, index) => (
-                    <span
-                      key={index}
-                      className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm"
-                    >
-                      {preference}
-                    </span>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {summary.user_preferences.map((preference, index) => (
+                  <span
+                    key={index}
+                    className="text-xs text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full"
+                  >
+                    {preference}
+                  </span>
+                ))}
               </div>
             </div>
           )}
 
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-              <MessageSquare className="w-5 h-5 mr-2 text-blue-500" />
-              Conversation Summary
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-gray-400" />
+              Summary
             </h3>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-gray-800 leading-relaxed">
-                {summary.summary_text}
-              </p>
+            <div className="text-sm text-gray-700 leading-relaxed">
+              {summary.summary_text}
             </div>
           </div>
 
           {summary.user_phone && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">Contact Information</h3>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2">
-                  <User className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-800">Phone: {summary.user_phone}</span>
-                </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Contact</h3>
+              <div className="text-sm text-gray-600">
+                {summary.user_phone}
               </div>
             </div>
           )}
         </div>
 
-        <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
-          <div className="text-sm text-gray-500">
-            Generated on {formatDate(new Date())}
+        <DialogFooter className="border-t border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between w-full">
+            <div className="text-xs text-gray-400">
+              {formatDate(new Date())}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownload}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
-          <div className="flex space-x-3">
-            <button
-              onClick={handleDownload}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

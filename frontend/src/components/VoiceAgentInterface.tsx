@@ -57,7 +57,10 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         duration: Infinity,
       });
     } else if (isAgentConnected && connectingToastRef.current !== null) {
-      toast.success('Agent connected!', { id: connectingToastRef.current });
+      toast.success('Agent connected!', { 
+        id: connectingToastRef.current,
+        duration: 2000 
+      });
       connectingToastRef.current = null;
     }
   }, [isAgentConnected]);
@@ -189,7 +192,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         </div>
 
         {/* LiveKit Control Bar */}
-        <div className="pb-8">
+        <div className="border px-8 bg-white shadow-lg rounded-xl">
           <ControlBar
             variation="minimal"
             controls={{

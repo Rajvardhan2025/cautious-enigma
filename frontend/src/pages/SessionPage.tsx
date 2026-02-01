@@ -110,9 +110,10 @@ function SessionPage() {
         <RoomAudioRenderer />
       </LiveKitRoom>
 
-      {showSummary && conversationSummary && (
+      {conversationSummary && (
         <ConversationSummary
           summary={conversationSummary}
+          open={showSummary}
           onClose={handleSummaryClose}
         />
       )}

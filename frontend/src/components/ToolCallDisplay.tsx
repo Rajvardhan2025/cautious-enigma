@@ -66,34 +66,34 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
   const getToolColor = (toolName: string): string => {
     switch (toolName) {
       case 'identify_user':
-        return 'bg-purple-100 text-purple-700 border-purple-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'fetch_slots':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'book_appointment':
-        return 'bg-green-100 text-green-700 border-green-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'retrieve_appointments':
-        return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'cancel_appointment':
-        return 'bg-red-100 text-red-700 border-red-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'modify_appointment':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'end_conversation':
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
       default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
   const getStatusIcon = (status: string): React.ReactNode => {
     switch (status) {
       case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-gray-600" />;
       case 'error':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-gray-600" />;
       case 'pending':
-        return <AlertCircle className="w-4 h-4 text-yellow-500 animate-pulse" />;
+        return <AlertCircle className="w-4 h-4 text-gray-600 animate-pulse" />;
       default:
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-gray-600" />;
     }
   };
 
@@ -130,27 +130,25 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
 
   if (toolCalls.length === 0) {
     return (
-      <div className="p-6 text-center text-gray-500">
-        <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+      <div className="p-6 text-center text-gray-400">
+        <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-200" />
         <p className="text-sm">No tool calls yet</p>
-        <p className="text-xs mt-1">Tool calls will appear here as the assistant helps you</p>
+        <p className="text-xs mt-1 text-gray-400">Tool calls will appear here as the assistant helps you</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Tool Calls</h3>
-      
+    <div className="p-4 space-y-3">      
       {toolCalls.slice().reverse().map((toolCall) => (
         <div
           key={toolCall.id}
-          className={`border rounded-lg transition-all duration-200 ${
-            expandedCall === toolCall.id ? 'shadow-md' : 'shadow-sm'
+          className={`border border-gray-200 rounded-lg transition-all duration-200 ${
+            expandedCall === toolCall.id ? 'shadow-sm' : ''
           }`}
         >
           <div
-            className={`p-3 rounded-t-lg border-b cursor-pointer ${getToolColor(toolCall.tool_name)}`}
+            className={`p-3 rounded-t-lg border-b border-gray-200 cursor-pointer ${getToolColor(toolCall.tool_name)} hover:bg-gray-100 transition-colors`}
             onClick={() => setExpandedCall(
               expandedCall === toolCall.id ? null : toolCall.id
             )}
@@ -164,7 +162,7 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
               </div>
               <div className="flex items-center space-x-2">
                 {getStatusIcon(toolCall.status)}
-                <span className="text-xs">
+                <span className="text-xs text-gray-500">
                   {formatTimestamp(toolCall.timestamp)}
                 </span>
               </div>
@@ -175,21 +173,14 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
             <div className="p-3 bg-white rounded-b-lg space-y-3">
               {toolCall.parameters && Object.keys(toolCall.parameters).length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-600 mb-2">Parameters:</h4>
-                  <div className="bg-gray-50 rounded p-2 space-y-1">
+                  <h4 className="text-xs font-semibold text-gray-500 mb-2">Parameters:</h4>
+                  <div className="bg-gray-50 rounded p-2 space-y-1 border border-gray-100">
                     {formatParameters(toolCall.parameters)}
                   </div>
                 </div>
               )}
 
-              <div>
-                <h4 className="text-xs font-semibold text-gray-600 mb-2">Result:</h4>
-                <div className="bg-blue-50 rounded p-2">
-                  <p className="text-xs text-gray-800">{toolCall.result}</p>
-                </div>
-              </div>
-
-              <div className="text-xs text-gray-500 pt-2 border-t">
+              <div className="text-xs text-gray-400 pt-2 border-t border-gray-100">
                 Executed at {formatDate(new Date(toolCall.timestamp))}
               </div>
             </div>
@@ -197,20 +188,6 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
         </div>
       ))}
 
-      <div className="mt-6 pt-4 border-t">
-        <div className="grid grid-cols-2 gap-4 text-center">
-          <div className="bg-blue-50 rounded-lg p-3">
-            <div className="text-lg font-bold text-blue-600">{toolCalls.length}</div>
-            <div className="text-xs text-blue-700">Total Calls</div>
-          </div>
-          <div className="bg-green-50 rounded-lg p-3">
-            <div className="text-lg font-bold text-green-600">
-              {toolCalls.filter(call => call.status === 'success').length}
-            </div>
-            <div className="text-xs text-green-700">Successful</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
