@@ -1,5 +1,5 @@
 # LiveKit Agents and plugins
-livekit-agents[deepgram,gemini,openai]>=0.8.0
+livekit-agents[deepgram,gemini,openai]>=1.2.0
 livekit-plugins-deepgram>=0.6.0
 livekit-plugins-google>=0.6.0
 livekit-plugins-openai>=0.6.0

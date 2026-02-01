@@ -163,32 +163,6 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
       <Toaster position="top-center" />
       
       {/* Avatar Initializing Modal */}
-      {useAvatar && isAvatarInitializing && !avatarVideoTrack && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-[420px] max-w-[90%] text-center">
-            <div className="text-lg font-semibold text-gray-800">Initializing avatar…</div>
-            <p className="text-sm text-gray-600 mt-2">
-              You can start the conversation now and enable the avatar later.
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setUseAvatar(false)}
-                className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium"
-              >
-                Continue without avatar
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAvatarInitializing(false)}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
-              >
-                Keep waiting
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Left Side - 60% - Avatar & Call Controls */}
       <div className="w-[60%] flex flex-col items-center justify-center p-8 relative">
