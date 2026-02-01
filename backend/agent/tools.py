@@ -55,73 +55,53 @@ class VoiceAppointmentAgent(Agent):
         # Build instructions with optional user context
         base_instructions = """# Identity
 
-You are Alya, a friendly and efficient appointment booking assistant. Your primary role is to help users schedule, view, modify, and cancel appointments through natural voice conversation.
+You are Alya, a friendly and efficient appointment booking assistant for a medical clinic. Your primary role is to help users schedule, view, modify, and cancel appointments through natural voice conversation.
 
-# Output Formatting
+# Core Responsibilities
 
-When speaking, format your responses for natural text-to-speech:
-- Keep responses under 2 sentences when possible
-- Speak naturally like a human, not a robot
-- Say times as "12 PM" not "12:00" or "twelve hundred hours"
-- Say dates as "tomorrow" not "2024-01-15"
-- Never read out technical details, IDs, or system messages
-- Avoid spelling out words letter by letter unless specifically asked
-- Use conversational language, not formal or robotic phrasing
+1. **Identify the User**: You must identify the user by phone number before accessing or creating records.
+2. **Context Persistence**: If a user asks to do something (e.g., "See my appointments") but you need to identify them first, **you must remember their original request** and fulfill it immediately after identification matches.
+3. **Appointment Management**: Book, view, modify, or cancel appointments.
+   - **Booking is ONLY available for TOMORROW.**
+   - **Available slots**: 12 PM, 3 PM, 5 PM, 6 PM, 7 PM.
 
-# Tools
+# Conversation Flow Guidelines
 
-You have access to several tools to help users manage appointments:
-- Use tools only after the user has clearly provided the required information
-- Call one tool at a time and wait for the result before proceeding
-- Never mention tool names or that you're "calling a tool" to the user
-- If a tool requires information you don't have, ask the user for it first
-- Do not show internal reasoning, planning, or tool-calling details to the user
+1. **Start**: Greet the user or handle their immediate request.
+2. **Missing Info**: If you need information (like phone number) to complete a request, ask for it.
+3. **After Tool Execution**:
+   - If `identify_user` completes successfully: **Check the conversation history.**
+     - Did the user ask to see appointments? -> Call `retrieve_appointments`.
+     - Did the user ask to book? -> Call `book_appointment` or ask for time if missing.
+     - Did the user just say "Hello"? -> Ask how you can help.
+   - Do NOT simply restart the "Booking" script. React to the user's actual intent.
+4. **Name Collection**: If the user's name is missing (Result is 'User'), ask for it gently ("Could I get your name to personalize your account?"). After saving it, **resume the previous task**.
 
-# Goals
+# Output Style
 
-Your primary goal is to provide a seamless appointment booking experience:
+- **Natural**: Speak like a human. "Tomorrow", "12 PM".
+- **Concise**: Keep responses under 2 sentences.
+- **Proactive**: If a task is finished, ask "Anything else?"
 
-1. **Identify the user**: Get their phone number to look up their account
-2. **Personalize the experience**: If their name is missing, ask for it and save it
-3. **Help with appointments**: Book, view, modify, or cancel appointments as requested
-4. **Capture preferences**: If users mention preferences (morning/afternoon, specific doctors, locations), save them for future reference
-5. **Confirm actions**: Always confirm appointment details clearly before finalizing
+# Important Rules
 
-## Booking Guidelines
+- **Don't Loop**: If you just welcomed the user, don't welcome them again.
+- **Don't Force Booking**: If the user wants to *view* appointments, do not ask "What time works for you?". Just show the appointments.
+- **One Question at a Time**: Don't bombard the user.
+- **No Hallucinations**: You do NOT have capabilities to:
+  - Set reminders or alarms.
+  - Send SMS or emails.
+  - Access external calendars.
+  - Provide medical advice.
+  If a user asks for these, politely explain you cant do that and return to appointment management.
 
-- Appointments are ONLY available for tomorrow
-- Available times: 12 PM, 3 PM, 5 PM, 6 PM, 7 PM
-- Ask for one piece of information at a time
-- If the user requests another day, politely explain only tomorrow is available
-- If the user requests an unavailable time, offer the allowed times
+# After Identifying User or Setting Name
+- IMMEDIATELY check the conversation history for any pending request (e.g., "Book for 6 PM").
+- If a request is pending and you have all details, EXECUTE IT immediately. Do not ask "What would you like to do?" again.
+- If you don't have a pending request, THEN ask how you can help.
+"""
 
-## Conversation Flow
 
-- Ask ONE question at a time and wait for the user's response
-- Do NOT repeat yourself or ask the same question multiple times
-- When confirming, ask once and wait for a clear yes/no
-- Keep the conversation moving forward naturally
-
-# Guardrails
-
-Stay focused on appointment management:
-- Only handle appointment-related requests (booking, viewing, modifying, canceling)
-- If asked about topics outside appointments, politely redirect: "I'm here to help with appointments. What can I schedule for you?"
-- Do not provide medical advice, diagnoses, or treatment recommendations
-- Do not discuss pricing, insurance, or billing - direct users to contact the office directly
-- If the user wants to end the call (e.g., "cut the call", "hang up", "bye"), use the end_conversation tool
-
-# Conversation Style
-
-Be warm, brief, and helpful:
-- Use a friendly, conversational tone
-- Show empathy and patience
-- Celebrate successful bookings with brief enthusiasm
-- Keep responses concise to respect the user's time
-- Never mention rules, policies, or that you're "waiting for the user"
-- Avoid robotic phrases like "I will now..." or "Processing your request..."
-
-Remember: You're having a natural conversation, not reading a script."""
 
         # Add user information section if provided
         if user_context:
@@ -284,12 +264,11 @@ Remember: You're having a natural conversation, not reading a script."""
                 
                 logger.info(f"✅ User found: {self.context.user_name}")
                 if not user.get('name') or user.get('name') == 'User':
-                    response = "Thanks! What's your name?"
+                    # Fallthrough to logic below
+                    pass
                 else:
-                    response = (
-                        f"Welcome back, {self.context.user_name}! What time tomorrow works for you—"
-                        f"{', '.join(['12 PM','3 PM','5 PM','6 PM','7 PM'])}?"
-                    )
+                    # Fallthrough to logic below
+                    pass
             else:
                 # Create new user
                 user_data = {
@@ -312,18 +291,28 @@ Remember: You're having a natural conversation, not reading a script."""
                 })
                 
                 logger.info(f"✅ New user created")
-                response = "Thanks! What's your name?"
+                
+            # Determine response for UI and LLM
+            has_name = self.context.user_name and self.context.user_name != 'User'
             
-            # Send tool call event to frontend
-            await self._send_tool_call_event(context, "identify_user", {"phone_number": phone_number}, response)
-            await self._say_response(context, response)
-            return None
+            if has_name:
+                ui_response = f"Welcome back, {self.context.user_name}!"
+                llm_response = f"User identified as {self.context.user_name}. Check conversation history for pending requests."
+            else:
+                ui_response = "Thanks! Could I get your name?"
+                llm_response = "User identified but name is missing. Ask for name."
+            
+            # Send tool call event to frontend with UI-friendly message
+            await self._send_tool_call_event(context, "identify_user", {"phone_number": phone_number}, ui_response)
+            
+            # Return system status to LLM (do not speak directly)
+            return llm_response
                 
         except Exception as e:
             logger.error(f"❌ Error identifying user: {e}", exc_info=True)
             response = "Sorry, I couldn't find that number. Can you try again?"
             await self._say_response(context, response)
-            return None
+            return response
 
     @function_tool
     async def set_user_name(self, context: RunContext, name: str) -> str:
@@ -349,13 +338,13 @@ Remember: You're having a natural conversation, not reading a script."""
             self.context.tracker.user_name = clean_name
             self.context.tracker.add_event('name_saved', {'name': clean_name})
 
-            response = (
-                f"Thanks, {clean_name}! What time tomorrow works for you—"
-                f"{', '.join(['12 PM','3 PM','5 PM','6 PM','7 PM'])}?"
-            )
-            await self._send_tool_call_event(context, "set_user_name", {"name": clean_name}, response)
-            await self._say_response(context, response)
-            return None
+            ui_response = f"Thanks, {clean_name}!"
+            llm_response = f"User name set to {clean_name}. Check conversation history for pending requests."
+
+            await self._send_tool_call_event(context, "set_user_name", {"name": clean_name}, ui_response)
+            
+            # Return system status to LLM (do not speak directly)
+            return llm_response
 
         except Exception as e:
             logger.error(f"❌ Error setting user name: {e}", exc_info=True)
@@ -424,14 +413,14 @@ Remember: You're having a natural conversation, not reading a script."""
                 )
             
             await self._send_tool_call_event(context, "fetch_slots", {"date": normalized_date or date}, response)
-            await self._say_response(context, response)
-            return None
+            
+            return response
                     
         except Exception as e:
             logger.error(f"❌ Error fetching slots: {e}", exc_info=True)
             response = "Can't check slots right now. Try again?"
             await self._say_response(context, response)
-            return None
+            return response
 
     @function_tool
     async def book_appointment(self, context: RunContext, date: str, time: str, purpose: str = "General consultation") -> str:
@@ -553,14 +542,15 @@ Remember: You're having a natural conversation, not reading a script."""
             
             await self._send_tool_call_event(context, "book_appointment", 
                 {"date": normalized_date, "time": normalized_time, "purpose": purpose}, response)
-            await self._say_response(context, response)
-            return None
+            
+            # Return context for LLM to confirm
+            return response
             
         except Exception as e:
             logger.error(f"❌ Error booking appointment: {e}", exc_info=True)
             response = "Sorry, couldn't book that. Try a different time?"
             await self._say_response(context, response)
-            return None
+            return response
 
     @function_tool
     async def retrieve_appointments(self, context: RunContext) -> str:
@@ -611,14 +601,15 @@ Remember: You're having a natural conversation, not reading a script."""
             
             await self._send_tool_call_event(context, "retrieve_appointments", 
                 {"count": len(appointments)}, response)
-            await self._say_response(context, response)
-            return None
+            
+            # Return full response to LLM
+            return response
             
         except Exception as e:
             logger.error(f"❌ Error retrieving appointments: {e}", exc_info=True)
             response = "I'm having trouble accessing your appointments right now. Please try again in a moment."
             await self._say_response(context, response)
-            return None
+            return response
 
     @function_tool
     async def cancel_appointment(self, context: RunContext, appointment_id: str = None, date: str = None, time: str = None) -> str:
@@ -673,16 +664,18 @@ Remember: You're having a natural conversation, not reading a script."""
             logger.info(f"✅ Appointment cancelled")
             
             response = f"I've cancelled your appointment on {formatted_date}. Anything else?"
+
             await self._send_tool_call_event(context, "cancel_appointment", 
                 {"date": date, "time": time}, response)
-            await self._say_response(context, response)
-            return None
+            
+            # Return response for LLM to confirm
+            return response
             
         except Exception as e:
             logger.error(f"❌ Error cancelling appointment: {e}", exc_info=True)
             response = "I'm sorry, I couldn't cancel that appointment right now. Please try again."
             await self._say_response(context, response)
-            return None
+            return response
 
     @function_tool
     async def modify_appointment(self, context: RunContext, appointment_id: str, new_date: str = None, new_time: str = None, new_purpose: str = None) -> str:
@@ -768,14 +761,15 @@ Remember: You're having a natural conversation, not reading a script."""
             
             await self._send_tool_call_event(context, "modify_appointment", 
                 {"appointment_id": appointment_id, "updates": updates}, response)
-            await self._say_response(context, response)
-            return None
+
+            # Return response for LLM
+            return response
             
         except Exception as e:
             logger.error(f"❌ Error modifying appointment: {e}", exc_info=True)
             response = "I'm sorry, I couldn't modify that appointment right now. Please try again."
             await self._say_response(context, response)
-            return None
+            return response
 
     @function_tool
     async def end_conversation(self, context: RunContext) -> str:
