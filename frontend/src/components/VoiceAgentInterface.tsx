@@ -69,37 +69,49 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
     const checkForAgent = () => {
       const participants = Array.from(room.remoteParticipants.values());
-      console.log('All participants in room:', participants.map(p => ({ identity: p.identity, name: p.name })));
+      console.log('[Agent Detection] All participants:', participants.map(p => ({ identity: p.identity, name: p.name })));
+      console.log('[Agent Detection] Mode:', useAvatar ? 'Avatar' : 'Non-Avatar');
 
-      // When using avatar, we need both voice agent and avatar agent
       if (useAvatar) {
-        const hasVoiceAgent = participants.some(p => 
-          p.identity.toLowerCase().includes('voice') || 
-          p.identity.toLowerCase().includes('agent')
-        );
-        const hasAvatarAgent = participants.some(p => 
-          p.identity.toLowerCase().includes('bey') || 
-          p.identity.toLowerCase().includes('avatar')
-        );
-        
-        if (hasVoiceAgent && hasAvatarAgent) {
-          console.log('Both voice agent and avatar agent detected in room');
-          setIsAgentConnected(true);
-        } else {
-          console.log(`Waiting for agents - Voice: ${hasVoiceAgent}, Avatar: ${hasAvatarAgent}`);
-        }
-      } else {
-        // Without avatar, just need the voice agent
-        const agentPresent = participants.some(p => {
-          const matchesKeyword = APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
-            p.identity.toLowerCase().includes(keyword)
-          );
-          return matchesKeyword;
+        // Avatar mode: Need exactly 2 agents - voice agent AND bey-agent
+        const voiceAgent = participants.find(p => {
+          const identity = p.identity.toLowerCase();
+          return (identity.includes('voice') || identity.includes('agent')) && !identity.includes('bey');
+        });
+        const beyAgent = participants.find(p => {
+          const identity = p.identity.toLowerCase();
+          return identity.includes('bey');
         });
 
-        if (agentPresent) {
-          console.log('Voice agent detected in room');
+        console.log('[Avatar Mode] Voice agent found:', !!voiceAgent, voiceAgent?.identity);
+        console.log('[Avatar Mode] Bey agent found:', !!beyAgent, beyAgent?.identity);
+
+        if (voiceAgent && beyAgent) {
+          console.log('[Avatar Mode] ✓ Both agents connected');
           setIsAgentConnected(true);
+        } else {
+          console.log('[Avatar Mode] ✗ Waiting for both agents');
+          setIsAgentConnected(false);
+        }
+      } else {
+        // Non-avatar mode: Need exactly 1 agent (voice agent only)
+        const voiceAgent = participants.find(p => {
+          const identity = p.identity.toLowerCase();
+          const hasAgentKeyword = APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
+            identity.includes(keyword)
+          );
+          // Exclude bey-agent from non-avatar mode
+          return hasAgentKeyword && !identity.includes('bey');
+        });
+
+        console.log('[Non-Avatar Mode] Voice agent found:', !!voiceAgent, voiceAgent?.identity);
+
+        if (voiceAgent) {
+          console.log('[Non-Avatar Mode] ✓ Agent connected');
+          setIsAgentConnected(true);
+        } else {
+          console.log('[Non-Avatar Mode] ✗ Waiting for agent');
+          setIsAgentConnected(false);
         }
       }
     };
@@ -107,42 +119,21 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
     checkForAgent();
 
     const handleParticipantConnected = (participant: Participant) => {
-      console.log('Participant connected:', { identity: participant.identity, name: participant.name, isLocal: participant.isLocal });
-      
+      console.log('[Agent Detection] 🔵 Participant connected:', {
+        identity: participant.identity,
+        name: participant.name,
+        isLocal: participant.isLocal
+      });
+
       // Re-check agent status whenever a participant connects
       checkForAgent();
     };
 
     const handleParticipantDisconnected = (participant: Participant) => {
-      console.log('Participant disconnected:', participant.identity);
-      
+      console.log('[Agent Detection] 🔴 Participant disconnected:', participant.identity);
+
       // Re-check agent status when someone disconnects
-      const participants = Array.from(room.remoteParticipants.values());
-      
-      if (useAvatar) {
-        const hasVoiceAgent = participants.some(p => 
-          p.identity.toLowerCase().includes('voice') || 
-          p.identity.toLowerCase().includes('agent')
-        );
-        const hasAvatarAgent = participants.some(p => 
-          p.identity.toLowerCase().includes('bey') || 
-          p.identity.toLowerCase().includes('avatar')
-        );
-        
-        if (!hasVoiceAgent || !hasAvatarAgent) {
-          setIsAgentConnected(false);
-        }
-      } else {
-        const agentPresent = participants.some(p => 
-          APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
-            p.identity.toLowerCase().includes(keyword)
-          )
-        );
-        
-        if (!agentPresent) {
-          setIsAgentConnected(false);
-        }
-      }
+      checkForAgent();
     };
 
     const handleDataReceived = (payload: Uint8Array) => {
@@ -183,7 +174,55 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         setIsSpeaking(track.publication?.track?.isMuted === false);
       }
     });
-  }, [audioTracks]);
+
+    // Also re-check agent connection when audio tracks change
+    // This catches cases where the agent was already in the room
+    if (room && audioTracks.length > 0) {
+      const participants = Array.from(room.remoteParticipants.values());
+      if (participants.length > 0 && !isAgentConnected) {
+        console.log('[Agent Detection] 🔍 Audio tracks changed, re-checking for agent...');
+        const checkForAgent = () => {
+          console.log('[Agent Detection] All participants:', participants.map(p => ({ identity: p.identity, name: p.name })));
+          console.log('[Agent Detection] Mode:', useAvatar ? 'Avatar' : 'Non-Avatar');
+
+          if (useAvatar) {
+            const voiceAgent = participants.find(p => {
+              const identity = p.identity.toLowerCase();
+              return (identity.includes('voice') || identity.includes('agent')) && !identity.includes('bey');
+            });
+            const beyAgent = participants.find(p => {
+              const identity = p.identity.toLowerCase();
+              return identity.includes('bey');
+            });
+
+            console.log('[Avatar Mode] Voice agent found:', !!voiceAgent, voiceAgent?.identity);
+            console.log('[Avatar Mode] Bey agent found:', !!beyAgent, beyAgent?.identity);
+
+            if (voiceAgent && beyAgent) {
+              console.log('[Avatar Mode] ✓ Both agents connected');
+              setIsAgentConnected(true);
+            }
+          } else {
+            const voiceAgent = participants.find(p => {
+              const identity = p.identity.toLowerCase();
+              const hasAgentKeyword = APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
+                identity.includes(keyword)
+              );
+              return hasAgentKeyword && !identity.includes('bey');
+            });
+
+            console.log('[Non-Avatar Mode] Voice agent found:', !!voiceAgent, voiceAgent?.identity);
+
+            if (voiceAgent) {
+              console.log('[Non-Avatar Mode] ✓ Agent connected');
+              setIsAgentConnected(true);
+            }
+          }
+        };
+        checkForAgent();
+      }
+    }
+  }, [audioTracks, room, isAgentConnected, useAvatar]);
 
   const avatarVideoTrack = useAvatar
     ? videoTracks.find(track => !track.participant.isLocal)
