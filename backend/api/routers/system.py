@@ -75,15 +75,16 @@ async def create_session(request: SessionRequest):
         
         # Dispatch agent to the room
         try:
-            await livekit_api.agent_dispatch.create_dispatch(
+            dispatch_response = await livekit_api.agent_dispatch.create_dispatch(
                 api.CreateAgentDispatchRequest(
                     agent_name="voice-appointment-agent",
                     room=room_name,
                 )
             )
             logger.info(f"Dispatched agent to room: {room_name}")
+            logger.info(f"Dispatch response: {dispatch_response}")
         except Exception as e:
-            logger.error(f"Failed to dispatch agent: {e}")
+            logger.error(f"Failed to dispatch agent: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Failed to dispatch agent: {str(e)}")
         
         # Generate access token for participant
