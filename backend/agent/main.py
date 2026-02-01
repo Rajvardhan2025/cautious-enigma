@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from dotenv import load_dotenv
 
 from livekit import rtc
@@ -34,7 +35,13 @@ logging.getLogger("livekit.plugins.silero").setLevel(logging.WARNING)
 
 logger = logging.getLogger("agent")
 
+
 load_dotenv(".env.local")
+
+
+livekit_url = os.getenv("LIVEKIT_URL")
+logger.info(f"🔌 LIVEKIT_URL loaded: {livekit_url}")
+
 
 
 def get_llm_instance():
@@ -188,14 +195,38 @@ async def voice_appointment_agent(ctx: JobContext):
         bey_api_key = os.getenv("BEY_API_KEY")
         avatar_id = os.getenv("BEY_AVATAR_ID")
         
-        if bey_api_key and avatar_id:
+        # Check if user requested avatar
+        use_avatar = False  # Default to False
+        if ctx.room.metadata:
+            try:
+                metadata = json.loads(ctx.room.metadata)
+                use_avatar = metadata.get("use_avatar", False)
+            except Exception as e:
+                logger.warning(f"Failed to parse room metadata: {e}")
+        
+        if bey_api_key and avatar_id and use_avatar:
             logger.info("🧑‍🎤 Starting Beyond Presence avatar")
             try:
+                # Ensure LiveKit URL is in WebSocket format (wss://)
+                livekit_ws_url = livekit_url
+                if livekit_url and livekit_url.startswith("https://"):
+                    livekit_ws_url = livekit_url.replace("https://", "wss://")
+                    logger.info(f"🔄 Converted HTTPS to WSS: {livekit_ws_url}")
+                elif livekit_url and livekit_url.startswith("http://"):
+                    livekit_ws_url = livekit_url.replace("http://", "ws://")
+                    logger.info(f"🔄 Converted HTTP to WS: {livekit_ws_url}")
+                
                 avatar = bey.AvatarSession(avatar_id=avatar_id)
-                await avatar.start(session, room=ctx.room)
+                await avatar.start(
+                    session, 
+                    room=ctx.room,
+                    livekit_url=livekit_ws_url
+                )
                 logger.info("✅ Beyond Presence avatar started")
             except Exception as e:
                 logger.error(f"❌ Failed to start BEY avatar: {e}")
+        elif not use_avatar:
+            logger.info("⏭️  Avatar disabled by user")
         
         await session.start(
             agent=agent,
