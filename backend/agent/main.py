@@ -116,18 +116,9 @@ async def voice_appointment_agent(ctx: JobContext):
         
         session = AgentSession(
             # Use Deepgram for STT
-            stt=deepgram.STT(
-                model="nova-3",
-                language="en-US",
-                detect_language=False,
-                interim_results=True,
-                punctuate=True,
-                smart_format=True,
-                numerals=True,
-                no_delay=True,
-                filler_words=False,
-                vad_events=True,
-                endpointing_ms=100,  # Balance responsiveness with fewer false turn ends
+            stt=deepgram.STTv2(
+                model="flux-general-en",
+                eager_eot_threshold=0.4,
                 keyterms=[
                     "appointment",
                     "book",
@@ -150,9 +141,8 @@ async def voice_appointment_agent(ctx: JobContext):
                 model="aura-2-asteria-en",
             ),
             # VAD and turn detection
-            turn_detection=MultilingualModel(),
-            vad=ctx.proc.userdata["vad"],
-            preemptive_generation=False,  # Disable to prevent speaking before user finishes
+            turn_detection="stt",
+            vad=silero.VAD.load(),
         )
         
         logger.info("✅ Agent session initialized successfully")
@@ -191,18 +181,28 @@ async def voice_appointment_agent(ctx: JobContext):
         
         logger.info("🚀 Starting agent session")
         
-        # Start Beyond Presence avatar if configured
-        bey_api_key = os.getenv("BEY_API_KEY")
-        avatar_id = os.getenv("BEY_AVATAR_ID")
-        
-        # Check if user requested avatar
-        use_avatar = False  # Default to False
+        # Extract user context from job metadata if available
+        user_context = None
         if ctx.room.metadata:
             try:
                 metadata = json.loads(ctx.room.metadata)
+                user_context = metadata.get("user_context")
                 use_avatar = metadata.get("use_avatar", False)
+                if user_context:
+                    logger.info(f"📋 Loaded user context from metadata: {user_context.get('name', 'Unknown')}")
             except Exception as e:
                 logger.warning(f"Failed to parse room metadata: {e}")
+                use_avatar = False
+        else:
+            use_avatar = False
+        
+        # Create agent with optional user context
+        logger.info("🤖 Creating VoiceAppointmentAgent instance")
+        agent = VoiceAppointmentAgent(user_context=user_context)
+        
+        # Start Beyond Presence avatar if configured
+        bey_api_key = os.getenv("BEY_API_KEY")
+        avatar_id = os.getenv("BEY_AVATAR_ID")
         
         if bey_api_key and avatar_id and use_avatar:
             logger.info("🧑‍🎤 Starting Beyond Presence avatar")
