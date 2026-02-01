@@ -162,17 +162,17 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
   }, [useAvatar, avatarVideoTrack, isAgentConnected]);
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="h-screen flex flex-col lg:flex-row overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
       <Toaster position="top-center" />
       
       {/* Avatar Initializing Modal */}
 
-      {/* Left Side - 60% - Avatar & Call Controls */}
-      <div className="w-[60%] flex flex-col items-center justify-center p-8 relative">
+      {/* Left Side - Avatar & Call Controls */}
+      <div className="w-full lg:w-[60%] flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative">
         {/* Avatar Display */}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center w-full">
           {avatarVideoTrack ? (
-            <div className="w-[480px] h-[480px] rounded-3xl overflow-hidden shadow-2xl border border-white/60 bg-black">
+            <div className="w-full max-w-[280px] h-[280px] sm:max-w-[360px] sm:h-[360px] lg:max-w-[480px] lg:h-[480px] rounded-3xl overflow-hidden shadow-2xl border border-white/60 bg-black">
               <VideoTrack
                 trackRef={avatarVideoTrack}
                 className="w-full h-full object-cover"
@@ -192,7 +192,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         </div>
 
         {/* LiveKit Control Bar */}
-        <div className="border px-8 bg-white shadow-lg rounded-xl">
+        <div className="border px-4 sm:px-6 lg:px-8 bg-white shadow-lg rounded-xl w-full max-w-md">
           <ControlBar
             variation="minimal"
             controls={{
@@ -206,12 +206,12 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         </div>
       </div>
 
-      {/* Right Side - 40% - Chat Activity Section */}
-      <div className="w-[40%] bg-white shadow-2xl flex flex-col overflow-hidden border-l border-gray-200">
+      {/* Right Side - Chat Activity Section */}
+      <div className="w-full lg:w-[40%] bg-white shadow-2xl flex flex-col overflow-hidden border-t lg:border-t-0 lg:border-l border-gray-200 max-h-[50vh] lg:max-h-none">
 
         {/* Live Transcript Section */}
         <div className="flex-1 flex flex-col overflow-hidden border-b border-gray-200">
-          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-50 border-b border-gray-200">
             <p className="text-xs text-gray-500 mt-0.5">Transcript</p>
           </div>
           <div className="flex-1 overflow-hidden bg-white">
@@ -221,10 +221,10 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
         {/* Tool Calls Section */}
         <div className="flex-shrink-0 bg-white">
-          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-50 border-b border-gray-200">
             <p className="text-xs text-gray-500 mt-0.5">Actions performed by the agent</p>
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-40 sm:max-h-60 lg:max-h-80 overflow-y-auto">
             <ToolCallDisplay toolCalls={toolCalls} />
           </div>
         </div>

@@ -130,16 +130,16 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
 
   if (toolCalls.length === 0) {
     return (
-      <div className="p-6 text-center text-gray-400">
-        <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-200" />
-        <p className="text-sm">No tool calls yet</p>
-        <p className="text-xs mt-1 text-gray-400">Tool calls will appear here as the assistant helps you</p>
+      <div className="p-4 sm:p-6 text-center text-gray-400">
+        <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-200" />
+        <p className="text-xs sm:text-sm">No tool calls yet</p>
+        <p className="text-[10px] sm:text-xs mt-1 text-gray-400">Tool calls will appear here as the assistant helps you</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-3">      
+    <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">      
       {toolCalls.slice().reverse().map((toolCall) => (
         <div
           key={toolCall.id}
@@ -148,21 +148,23 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
           }`}
         >
           <div
-            className={`p-3 rounded-t-lg border-b border-gray-200 cursor-pointer ${getToolColor(toolCall.tool_name)} hover:bg-gray-100 transition-colors`}
+            className={`p-2.5 sm:p-3 rounded-t-lg border-b border-gray-200 cursor-pointer ${getToolColor(toolCall.tool_name)} hover:bg-gray-100 transition-colors`}
             onClick={() => setExpandedCall(
               expandedCall === toolCall.id ? null : toolCall.id
             )}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                {getToolIcon(toolCall.tool_name)}
-                <span className="font-medium text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0">
+                <div className="flex-shrink-0">
+                  {getToolIcon(toolCall.tool_name)}
+                </div>
+                <span className="font-medium text-xs sm:text-sm truncate">
                   {formatToolName(toolCall.tool_name)}
                 </span>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
                 {getStatusIcon(toolCall.status)}
-                <span className="text-xs text-gray-500">
+                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:inline">
                   {formatTimestamp(toolCall.timestamp)}
                 </span>
               </div>
@@ -170,17 +172,17 @@ const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCalls }) => {
           </div>
 
           {expandedCall === toolCall.id && (
-            <div className="p-3 bg-white rounded-b-lg space-y-3">
+            <div className="p-2.5 sm:p-3 bg-white rounded-b-lg space-y-2 sm:space-y-3">
               {toolCall.parameters && Object.keys(toolCall.parameters).length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-2">Parameters:</h4>
-                  <div className="bg-gray-50 rounded p-2 space-y-1 border border-gray-100">
+                  <h4 className="text-[10px] sm:text-xs font-semibold text-gray-500 mb-1.5 sm:mb-2">Parameters:</h4>
+                  <div className="bg-gray-50 rounded p-1.5 sm:p-2 space-y-1 border border-gray-100">
                     {formatParameters(toolCall.parameters)}
                   </div>
                 </div>
               )}
 
-              <div className="text-xs text-gray-400 pt-2 border-t border-gray-100">
+              <div className="text-[10px] sm:text-xs text-gray-400 pt-1.5 sm:pt-2 border-t border-gray-100">
                 Executed at {formatDate(new Date(toolCall.timestamp))}
               </div>
             </div>

@@ -82,22 +82,22 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ connectionState, is
   const agentInfo = getAgentStatus();
 
   return (
-    <div className="flex items-center space-x-4">
-      <div className="flex items-center space-x-2">
-        <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${connectionInfo.color}`}>
-          {connectionInfo.icon}
-          <span>{connectionInfo.text}</span>
+    <div className="flex items-center space-x-2 sm:space-x-4">
+      <div className="flex items-center space-x-1 sm:space-x-2">
+        <div className={`flex items-center space-x-0.5 sm:space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${connectionInfo.color}`}>
+          <div className="scale-75 sm:scale-100">{connectionInfo.icon}</div>
+          <span className="hidden sm:inline">{connectionInfo.text}</span>
         </div>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${agentInfo.color}`}>
-          {agentInfo.icon}
-          <span>{agentInfo.text}</span>
+      <div className="flex items-center space-x-1 sm:space-x-2">
+        <div className={`flex items-center space-x-0.5 sm:space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${agentInfo.color}`}>
+          <div className="scale-75 sm:scale-100">{agentInfo.icon}</div>
+          <span className="hidden sm:inline">{agentInfo.text}</span>
         </div>
       </div>
 
-      <div className="relative group">
+      <div className="relative group hidden sm:block">
         <button className="text-gray-400 hover:text-gray-600 transition-colors">
           <AlertCircle className="w-4 h-4" />
         </button>

@@ -65,13 +65,13 @@ function SessionPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">{APP_CONSTANTS.STATUS.ERROR}</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+        <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 max-w-md w-full text-center">
+          <div className="text-red-500 text-5xl sm:text-6xl mb-4">⚠️</div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">{APP_CONSTANTS.STATUS.ERROR}</h2>
+          <p className="text-sm sm:text-base text-gray-600 mb-6">{error}</p>
           <button
             onClick={handleDisconnect}
-            className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors text-sm sm:text-base"
           >
             Go Back
           </button>
