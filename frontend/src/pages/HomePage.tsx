@@ -26,7 +26,7 @@ function HomePage() {
           <AnimatedOrb size={256} />
         </div>
         <p className="text-2xl font-medium text-stone-400 mb-2">
-          Voice Appointment Assistant
+          Appointment Assistant
         </p>
         <p className="text-sm text-stone-400">
           Click anywhere to get started

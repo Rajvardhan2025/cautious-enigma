@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   useRoomContext,
   useTracks,
@@ -10,8 +10,10 @@ import {
   Track,
   Participant
 } from 'livekit-client';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 
-import AvatarDisplay from './AvatarDisplay';
+import { AgentAudioVisualizerAura } from '@/components/agents-ui/agent-audio-visualizer-aura';
 import LiveTranscript from './LiveTranscript';
 import ToolCallDisplay from './ToolCallDisplay';
 import { ToolCall, ConversationSummaryData } from '../types';
@@ -35,6 +37,30 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [useAvatar, setUseAvatar] = useState(initialUseAvatar);
   const [isAvatarInitializing, setIsAvatarInitializing] = useState(false);
+  const connectingToastRef = useRef<string | number | null>(null);
+
+  // Get agent state for the visualizer
+  const getAgentState = () => {
+    if (!isAgentConnected) return 'connecting';
+    if (isSpeaking) return 'speaking';
+    if (isListening) return 'listening';
+    return 'idle';
+  };
+
+  // Get the agent's audio track for visualization
+  const agentAudioTrack = audioTracks.find(track => !track.participant.isLocal);
+
+  // Show toast when connecting
+  useEffect(() => {
+    if (!isAgentConnected && connectingToastRef.current === null) {
+      connectingToastRef.current = toast.loading('Connecting to agent...', {
+        duration: Infinity,
+      });
+    } else if (isAgentConnected && connectingToastRef.current !== null) {
+      toast.success('Agent connected!', { id: connectingToastRef.current });
+      connectingToastRef.current = null;
+    }
+  }, [isAgentConnected]);
 
   useEffect(() => {
     if (!room) return;
@@ -134,6 +160,8 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
   return (
     <div className="h-screen flex overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
+      <Toaster position="top-center" />
+      
       {/* Avatar Initializing Modal */}
       {useAvatar && isAvatarInitializing && !avatarVideoTrack && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -174,11 +202,15 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
               />
             </div>
           ) : (
-            <AvatarDisplay
-              isListening={isListening}
-              isSpeaking={isSpeaking}
-              isConnected={isAgentConnected}
-            />
+            <div className="flex items-center justify-center">
+              <AgentAudioVisualizerAura
+                size="xl"
+                state={getAgentState()}
+                audioTrack={agentAudioTrack}
+                color="#1FD5F9"
+                colorShift={0.4}
+              />
+            </div>
           )}
         </div>
 
