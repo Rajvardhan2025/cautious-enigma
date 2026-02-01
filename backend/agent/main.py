@@ -1,11 +1,8 @@
 import logging
-import asyncio
-import time
 import os
-import json
 from dotenv import load_dotenv
 
-from livekit import rtc, api
+from livekit import rtc
 from livekit.agents import (
     AgentServer,
     AgentSession,
@@ -99,120 +96,13 @@ async def voice_appointment_agent(ctx: JobContext):
             "room": ctx.room.name,
         }
         
-        # Track if user has left
-        user_left = False
-        
         @ctx.room.on("participant_connected")
         def on_participant_connected(participant: rtc.RemoteParticipant):
-            logger.info(f"👤 Participant joined: {participant.identity} (kind: {participant.kind})")
+            logger.info(f"👤 Participant joined: {participant.identity}")
         
-        def _is_agent_participant(identity: str) -> bool:
-            identity_lower = (identity or "").lower()
-            return identity_lower.startswith("agent") or "bey-avatar" in identity_lower
-
-        bey_retry_task = None
-        cleanup_task = None
-        cleanup_started = False
-        use_avatar = True
-
-        try:
-            room_metadata = ctx.room.metadata or "{}"
-            metadata = json.loads(room_metadata)
-            use_avatar = bool(metadata.get("use_avatar", True))
-        except Exception:
-            use_avatar = True
-        bey_disabled_until = 0.0
-
-        async def _start_bey_avatar():
-            nonlocal bey_disabled_until
-            if not use_avatar:
-                logger.info("🟡 BEY avatar disabled for this room")
-                return
-            bey_api_key = os.getenv("BEY_API_KEY")
-            if not bey_api_key:
-                return
-
-            if time.monotonic() < bey_disabled_until:
-                logger.warning("⚠️  BEY avatar start suppressed due to recent 429; waiting before retry")
-                return
-
-            avatar_id = os.getenv("BEY_AVATAR_ID")
-            if not avatar_id:
-                logger.warning("⚠️  BEY_AVATAR_ID not set; using provider default avatar")
-
-            logger.info("🧑‍🎤 Starting Beyond Presence avatar")
-            avatar = bey.AvatarSession(
-                avatar_id=avatar_id,
-            )
-            try:
-                await avatar.start(session, room=ctx.room)
-            except Exception as e:
-                status_code = getattr(e, "status_code", None)
-                if status_code == 429:
-                    # Stop aggressive retrying when BEY rate limits/concurrency caps
-                    bey_disabled_until = time.monotonic() + 60
-                    logger.error("❌ BEY concurrency limit hit (429). Pausing avatar retries for 60s.")
-                raise
-            ctx.proc.userdata["bey_avatar"] = avatar
-            logger.info("✅ Beyond Presence avatar started and retained")
-
-        async def _cleanup_room(reason: str) -> None:
-            nonlocal cleanup_started
-            if cleanup_started:
-                return
-            cleanup_started = True
-
-            logger.info(f"🧹 Cleaning up room: {reason}")
-
-            if bey_retry_task and not bey_retry_task.done():
-                bey_retry_task.cancel()
-
-            # Delete the room to force avatar and agent shutdown
-            livekit_url = os.getenv("LIVEKIT_URL")
-            livekit_api_key = os.getenv("LIVEKIT_API_KEY")
-            livekit_api_secret = os.getenv("LIVEKIT_API_SECRET")
-
-            if all([livekit_url, livekit_api_key, livekit_api_secret]):
-                livekit_api = api.LiveKitAPI(
-                    url=livekit_url,
-                    api_key=livekit_api_key,
-                    api_secret=livekit_api_secret,
-                )
-                try:
-                    await livekit_api.room.delete_room(
-                        api.DeleteRoomRequest(room=ctx.room.name)
-                    )
-                    logger.info("✅ Room deleted")
-                except Exception as e:
-                    logger.error(f"❌ Failed to delete room: {e}", exc_info=True)
-                finally:
-                    await livekit_api.aclose()
-            else:
-                logger.warning("⚠️  LIVEKIT_URL/KEY/SECRET missing; cannot delete room")
-
-            try:
-                await ctx.room.disconnect()
-            except Exception:
-                pass
-
         @ctx.room.on("participant_disconnected")
         def on_participant_disconnected(participant: rtc.RemoteParticipant):
-            nonlocal user_left
-            nonlocal cleanup_task
-            logger.info(f"👋 Participant disconnected: {participant.identity}")
-            # If a human participant leaves, mark for cleanup
-            if not _is_agent_participant(participant.identity):
-                user_left = True
-                logger.info("🚪 User left the room, preparing to cleanup")
-                if not cleanup_task or cleanup_task.done():
-                    cleanup_task = asyncio.create_task(_cleanup_room("user disconnected"))
-                return
-
-            if "bey-avatar" in (participant.identity or "").lower():
-                if bey_retry_task and not bey_retry_task.done():
-                    return
-                logger.warning("⚠️  BEY avatar disconnected; retrying in 5s")
-                bey_retry_task = asyncio.create_task(_retry_bey_avatar())
+            logger.info(f"� Participant disconnected: {participant.identity}")
 
         # Set up voice AI pipeline with Deepgram and configurable LLM
         logger.info("🔧 Initializing agent session with STT, LLM, and TTS")
@@ -260,19 +150,6 @@ async def voice_appointment_agent(ctx: JobContext):
         
         logger.info("✅ Agent session initialized successfully")
 
-        # Start Beyond Presence avatar if configured
-        async def _retry_bey_avatar():
-            try:
-                await asyncio.sleep(5)
-                await _start_bey_avatar()
-            except Exception as e:
-                logger.error(f"❌ BEY avatar restart failed: {e}", exc_info=True)
-
-        try:
-            await _start_bey_avatar()
-        except Exception as e:
-            logger.error(f"❌ BEY avatar failed to start: {e}", exc_info=True)
-
         # Start the session with our appointment agent
         logger.info("🤖 Creating VoiceAppointmentAgent instance")
         agent = VoiceAppointmentAgent()
@@ -306,6 +183,20 @@ async def voice_appointment_agent(ctx: JobContext):
                     logger.info(f"✅ Tool completed: {call.function_info.name}")
         
         logger.info("🚀 Starting agent session")
+        
+        # Start Beyond Presence avatar if configured
+        bey_api_key = os.getenv("BEY_API_KEY")
+        avatar_id = os.getenv("BEY_AVATAR_ID")
+        
+        if bey_api_key and avatar_id:
+            logger.info("🧑‍🎤 Starting Beyond Presence avatar")
+            try:
+                avatar = bey.AvatarSession(avatar_id=avatar_id)
+                await avatar.start(session, room=ctx.room)
+                logger.info("✅ Beyond Presence avatar started")
+            except Exception as e:
+                logger.error(f"❌ Failed to start BEY avatar: {e}")
+        
         await session.start(
             agent=agent,
             room=ctx.room,
