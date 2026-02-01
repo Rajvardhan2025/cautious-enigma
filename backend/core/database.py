@@ -33,10 +33,10 @@ class DatabaseManager:
             # Create indexes
             await self._create_indexes()
             
-            logger.info(f"Connected to MongoDB: {db_name}")
+            logger.info(f"[Database] Connected to {db_name}")
             
         except Exception as e:
-            logger.error(f"Failed to connect to MongoDB: {e}")
+            logger.error(f"[Database] Connection failed: {e}")
             raise
     
     async def _create_indexes(self):
@@ -53,10 +53,8 @@ class DatabaseManager:
             # Conversation summary indexes
             await self.db.conversation_summaries.create_index([("user_id", 1), ("conversation_date", -1)])
             
-            logger.debug("Database indexes verified")
-            
         except Exception as e:
-            logger.error(f"Error creating indexes: {e}")
+            logger.error(f"[Database] Index creation error: {e}")
     
     async def ensure_connected(self):
         """Ensure database connection is active"""
@@ -70,11 +68,10 @@ class DatabaseManager:
         
         try:
             result = await self.db.users.insert_one(user_data)
-            logger.debug(f"Created user: {result.inserted_id}")
             return result.inserted_id
             
         except Exception as e:
-            logger.error(f"Error creating user: {e}")
+            logger.error(f"[Database] Create user error: {e}")
             raise
     
     async def get_user_by_phone(self, phone: str) -> Optional[Dict]:
@@ -86,7 +83,7 @@ class DatabaseManager:
             return user
             
         except Exception as e:
-            logger.error(f"Error getting user by phone: {e}")
+            logger.error(f"[Database] Get user by phone error: {e}")
             return None
     
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
@@ -98,7 +95,7 @@ class DatabaseManager:
             return user
             
         except Exception as e:
-            logger.error(f"Error getting user by ID: {e}")
+            logger.error(f"[Database] Get user by ID error: {e}")
             return None
     
     async def update_user(self, user_id: str, updates: Dict) -> bool:
@@ -113,7 +110,7 @@ class DatabaseManager:
             return result.modified_count > 0
             
         except Exception as e:
-            logger.error(f"Error updating user: {e}")
+            logger.error(f"[Database] Update user error: {e}")
             return False
     
     # Appointment operations
@@ -123,11 +120,10 @@ class DatabaseManager:
         
         try:
             result = await self.db.appointments.insert_one(appointment_data)
-            logger.debug(f"Created appointment: {result.inserted_id}")
             return result.inserted_id
             
         except Exception as e:
-            logger.error(f"Error creating appointment: {e}")
+            logger.error(f"[Database] Create appointment error: {e}")
             raise
     
     async def get_appointment_by_id(self, appointment_id: str, user_id: str) -> Optional[Dict]:
@@ -142,7 +138,7 @@ class DatabaseManager:
             return appointment
             
         except Exception as e:
-            logger.error(f"Error getting appointment by ID: {e}")
+            logger.error(f"[Database] Get appointment by ID error: {e}")
             return None
     
     async def get_appointment_by_datetime(self, user_id: str, date: str, time: str) -> Optional[Dict]:
@@ -159,7 +155,7 @@ class DatabaseManager:
             return appointment
             
         except Exception as e:
-            logger.error(f"Error getting appointment by datetime: {e}")
+            logger.error(f"[Database] Get appointment by datetime error: {e}")
             return None
     
     async def get_user_appointments(self, user_id: str, limit: int = 50) -> List[Dict]:
@@ -175,7 +171,7 @@ class DatabaseManager:
             return appointments
             
         except Exception as e:
-            logger.error(f"Error getting user appointments: {e}")
+            logger.error(f"[Database] Get user appointments error: {e}")
             return []
     
     async def get_booked_slots(self, date: str) -> List[str]:
@@ -193,7 +189,7 @@ class DatabaseManager:
             return booked_slots
             
         except Exception as e:
-            logger.error(f"Error getting booked slots: {e}")
+            logger.error(f"[Database] Get booked slots error: {e}")
             return []
     
     async def update_appointment(self, appointment_id: ObjectId, updates: Dict) -> bool:
@@ -209,7 +205,7 @@ class DatabaseManager:
             return result.modified_count > 0
             
         except Exception as e:
-            logger.error(f"Error updating appointment: {e}")
+            logger.error(f"[Database] Update appointment error: {e}")
             return False
     
     async def update_appointment_status(self, appointment_id: ObjectId, status: str) -> bool:
@@ -224,7 +220,7 @@ class DatabaseManager:
             return result.modified_count > 0
             
         except Exception as e:
-            logger.error(f"Error updating appointment status: {e}")
+            logger.error(f"[Database] Update appointment status error: {e}")
             return False
     
     # Conversation summary operations
@@ -234,11 +230,10 @@ class DatabaseManager:
         
         try:
             result = await self.db.conversation_summaries.insert_one(summary_data)
-            logger.debug(f"Saved conversation summary: {result.inserted_id}")
             return result.inserted_id
             
         except Exception as e:
-            logger.error(f"Error saving conversation summary: {e}")
+            logger.error(f"[Database] Save conversation summary error: {e}")
             raise
     
     async def get_user_conversation_summaries(self, user_id: str, limit: int = 10) -> List[Dict]:
@@ -254,7 +249,7 @@ class DatabaseManager:
             return summaries
             
         except Exception as e:
-            logger.error(f"Error getting conversation summaries: {e}")
+            logger.error(f"[Database] Get conversation summaries error: {e}")
             return []
     
     async def close(self):
@@ -262,4 +257,4 @@ class DatabaseManager:
         if self.client:
             self.client.close()
             self.connected = False
-            logger.info("Database connection closed")
+            logger.info("[Database] Connection closed")

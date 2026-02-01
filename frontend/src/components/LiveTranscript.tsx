@@ -29,7 +29,6 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
 
         const handleTranscriptionStream = (reader: any, participantInfo: any) => {
             const participantIdentity = typeof participantInfo === 'string' ? participantInfo : participantInfo?.identity;
-            console.log('[LiveTranscript] Received transcription stream from:', participantIdentity);
 
             const processStream = async () => {
                 try {
@@ -118,7 +117,7 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
                         return [...prev, nextMessage];
                     });
                 } catch (error) {
-                    console.error('[LiveTranscript] Error reading transcription stream:', error);
+                    // Silently ignore stream errors
                 }
             };
 
@@ -127,12 +126,8 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
 
         try {
             room.registerTextStreamHandler('lk.transcription', handleTranscriptionStream);
-            console.log('[LiveTranscript] Registered transcription handler');
         } catch (error: any) {
             // Silently ignore "already set" errors - handler is already registered
-            if (!error?.message?.includes('already been set')) {
-                console.error('[LiveTranscript] Error registering transcription handler:', error);
-            }
         }
 
         return () => {
@@ -142,30 +137,15 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
 
     // Combine chat messages and transcriptions
     useEffect(() => {
-        // Debug logging
-        console.log('[LiveTranscript] Chat messages:', chatMessages.length);
-        console.log('[LiveTranscript] Transcription messages:', transcriptionMessages.length);
-        console.log('[LiveTranscript] Participants:', participants.length);
-
         const messages: TranscriptMessage[] = [];
 
         // Add transcriptions
         transcriptionMessages.forEach((trans) => {
-            console.log('[LiveTranscript] Adding transcription:', {
-                from: trans.from.identity,
-                text: trans.message,
-                isFinal: trans.isFinal,
-            });
             messages.push(trans);
         });
 
         // Add chat messages
         chatMessages.forEach((msg) => {
-            console.log('[LiveTranscript] Adding chat message:', {
-                from: msg.from?.identity,
-                text: msg.message,
-            });
-
             messages.push({
                 id: msg.id || `chat-${msg.timestamp}`,
                 from: msg.from || { identity: 'unknown', name: 'Unknown' },
@@ -177,7 +157,6 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
 
         // Sort by timestamp
         messages.sort((a, b) => a.timestamp - b.timestamp);
-        console.log('[LiveTranscript] Total messages:', messages.length);
         setAllMessages(messages);
     }, [chatMessages, transcriptionMessages, participants]);
     const getAvatarColor = (identity: string): string => {

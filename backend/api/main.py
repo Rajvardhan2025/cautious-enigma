@@ -37,14 +37,14 @@ app.include_router(system.router)
 async def startup_event():
     """Initialize database connection on startup"""
     await db.connect()
-    logger.info("API server started successfully")
+    logger.info("[API] Server started")
 
 # Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database connection on shutdown"""
     await db.close()
-    logger.info("API server shutdown")
+    logger.info("[API] Server shutdown")
 
 # Error handlers
 @app.exception_handler(404)
@@ -56,7 +56,7 @@ async def not_found_handler(request, exc):
 
 @app.exception_handler(500)
 async def internal_error_handler(request, exc):
-    logger.error(f"Internal server error: {exc}")
+    logger.error(f"[API] Internal error: {exc}")
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"}

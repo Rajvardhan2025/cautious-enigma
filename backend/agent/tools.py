@@ -118,10 +118,8 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             base_instructions += "\n".join(user_info_parts)
 
         super().__init__(instructions=base_instructions)
-        logger.debug("🤖 VoiceAppointmentAgent initialized")
         self.db = DatabaseManager()
         self.context = ConversationContext()
-        logger.debug("✅ Database manager and conversation context ready")
 
     def _normalize_date(self, date_str: Optional[str]) -> Optional[str]:
         if not date_str:
@@ -192,7 +190,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             room = self._get_room_from_context(context)
 
             if not room:
-                logger.warning("⚠️  No room context available to send data event")
+                logger.debug("[DataEvent] No room context available")
                 return
 
             await room.local_participant.publish_data(
@@ -200,7 +198,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
                 reliable=True,
             )
         except Exception as e:
-            logger.error(f"❌ Error sending data event: {e}", exc_info=True)
+            logger.error(f"[DataEvent] Error: {e}")
 
     async def _send_tool_call_event(self, context: RunContext, tool_name: str, parameters: Dict, result: str):
         """Send tool call event to frontend for display"""
@@ -221,8 +219,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
         }
 
         await self._publish_data_event(context, event_data)
-        logger.info(f"tool: {tool_name} | params: {parameters}")
-        logger.debug(f"📤 Sent tool call event to frontend: {tool_name}")
+        logger.debug(f"[Tool] {tool_name} | {parameters}")
 
     async def _say_response(self, context: RunContext, text: str) -> None:
         """Speak the tool response verbatim to avoid LLM paraphrasing."""
@@ -232,7 +229,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
                 await session.say(text, allow_interruptions=True)
                 self.context.last_agent_message = text
         except Exception as e:
-            logger.error(f"❌ Error speaking tool response: {e}", exc_info=True)
+            logger.error(f"[Speech] Error: {e}")
 
     @function_tool
     async def identify_user(self, context: RunContext, phone_number: str) -> str:
@@ -241,7 +238,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
         Args:
             phone_number: The user's phone number for identification
         """
-        logger.info(f"🔍 identify_user: {phone_number}")
+        logger.debug(f"[identify_user] {phone_number}")
         
         try:
             # Clean phone number
@@ -262,7 +259,6 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
                     'has_name': bool(user.get('name'))
                 })
                 
-                logger.info(f"✅ User found: {self.context.user_name}")
                 if not user.get('name') or user.get('name') == 'User':
                     # Fallthrough to logic below
                     pass
@@ -290,8 +286,6 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
                     'new_user_created': True
                 })
                 
-                logger.info(f"✅ New user created")
-                
             # Determine response for UI and LLM
             has_name = self.context.user_name and self.context.user_name != 'User'
             
@@ -309,7 +303,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return llm_response
                 
         except Exception as e:
-            logger.error(f"❌ Error identifying user: {e}", exc_info=True)
+            logger.error(f"[identify_user] Error: {e}")
             response = "Sorry, I couldn't find that number. Can you try again?"
             await self._say_response(context, response)
             return response
@@ -321,7 +315,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
         Args:
             name: The user's name
         """
-        logger.info(f"👤 set_user_name: {name}")
+        logger.debug(f"[set_user_name] {name}")
 
         try:
             clean_name = name.strip()
@@ -347,7 +341,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return llm_response
 
         except Exception as e:
-            logger.error(f"❌ Error setting user name: {e}", exc_info=True)
+            logger.error(f"[set_user_name] Error: {e}")
             response = "Sorry, I couldn't save that name. What should I call you?"
             await self._say_response(context, response)
             return None
@@ -359,7 +353,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
         Args:
             preference: The preference text to store
         """
-        logger.info(f"⭐ add_user_preference: {preference}")
+        logger.debug(f"[add_user_preference] {preference}")
 
         try:
             clean_pref = preference.strip()
@@ -381,7 +375,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return None
 
         except Exception as e:
-            logger.error(f"❌ Error saving preference: {e}", exc_info=True)
+            logger.error(f"[add_user_preference] Error: {e}")
             response = "Sorry, I couldn't save that preference."
             await self._say_response(context, response)
             return None
@@ -393,7 +387,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
         Args:
             date: Date to check slots for (YYYY-MM-DD format). If not provided, shows next 7 days.
         """
-        logger.info(f"📅 fetch_slots: {date or 'allowed slots'}")
+        logger.debug(f"[fetch_slots] {date or 'tomorrow'}")
         
         try:
             normalized_date = self._normalize_date(date) if date else None
@@ -417,7 +411,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return response
                     
         except Exception as e:
-            logger.error(f"❌ Error fetching slots: {e}", exc_info=True)
+            logger.error(f"[fetch_slots] Error: {e}")
             response = "Can't check slots right now. Try again?"
             await self._say_response(context, response)
             return response
@@ -431,10 +425,10 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             time: Appointment time (HH:MM format)
             purpose: Purpose or reason for the appointment
         """
-        logger.info(f"📝 book_appointment: {date} {time}")
+        logger.debug(f"[book_appointment] {date} {time}")
         
         if not self.context.user_id:
-            logger.warning("⚠️  Cannot book appointment: User not identified")
+            logger.warning("[book_appointment] User not identified")
             response = "I need your phone number first."
             await self._say_response(context, response)
             return None
@@ -478,7 +472,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             booked_slots = await self.db.get_booked_slots(normalized_date)
 
             if datetime_str in booked_slots:
-                logger.warning(f"⚠️  Slot {datetime_str} is already booked")
+                logger.debug(f"[book_appointment] Slot {datetime_str} already booked")
                 allowed_slots = self._allowed_slots_for_date(normalized_date)
                 available_slots = [
                     slot for slot in allowed_slots
@@ -533,8 +527,6 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
                 'purpose': purpose
             })
             
-            logger.info(f"✅ Appointment booked: {normalized_date} {normalized_time}")
-            
             response = (
                 f"Perfect! You're all set for tomorrow at {self._format_time_ampm(normalized_time)}. "
                 "Anything else?"
@@ -547,7 +539,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return response
             
         except Exception as e:
-            logger.error(f"❌ Error booking appointment: {e}", exc_info=True)
+            logger.error(f"[book_appointment] Error: {e}")
             response = "Sorry, couldn't book that. Try a different time?"
             await self._say_response(context, response)
             return response
@@ -556,10 +548,10 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
     async def retrieve_appointments(self, context: RunContext) -> str:
         """Retrieve all appointments for the identified user.
         """
-        logger.info(f"📋 retrieve_appointments")
+        logger.debug("[retrieve_appointments]")
         
         if not self.context.user_id:
-            logger.warning("⚠️  Cannot retrieve appointments: User not identified")
+            logger.warning("[retrieve_appointments] User not identified")
             response = "I need to identify you first. Could you please provide your phone number?"
             await self._say_response(context, response)
             return None
@@ -568,7 +560,6 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             appointments = await self.db.get_user_appointments(self.context.user_id)
             
             if not appointments:
-                logger.debug(f"ℹ️  No appointments found")
                 response = "You don't have any appointments scheduled. Would you like to book one?"
                 await self._send_tool_call_event(context, "retrieve_appointments", {}, response)
                 await self._say_response(context, response)
@@ -591,7 +582,6 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             response_parts = []
             
             if upcoming:
-                logger.info(f"✅ Found {len(upcoming)} appointments")
                 response_parts.append("Your upcoming appointments:")
                 for apt in upcoming[:3]:  # Limit to 3 for brevity
                     formatted_date = apt['datetime'].strftime("%A, %B %d at %I:%M %p")
@@ -606,7 +596,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return response
             
         except Exception as e:
-            logger.error(f"❌ Error retrieving appointments: {e}", exc_info=True)
+            logger.error(f"[retrieve_appointments] Error: {e}")
             response = "I'm having trouble accessing your appointments right now. Please try again in a moment."
             await self._say_response(context, response)
             return response
@@ -620,10 +610,10 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             date: Appointment date (YYYY-MM-DD format) 
             time: Appointment time (HH:MM format)
         """
-        logger.info(f"❌ cancel_appointment: {appointment_id or f'{date} {time}'}")
+        logger.debug(f"[cancel_appointment] {appointment_id or f'{date} {time}'}")
         
         if not self.context.user_id:
-            logger.warning("⚠️  Cannot cancel appointment: User not identified")
+            logger.warning("[cancel_appointment] User not identified")
             response = "I need to identify you first. Could you please provide your phone number?"
             await self._say_response(context, response)
             return None
@@ -661,7 +651,6 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             self.context.tracker.track_appointment_cancelled(str(appointment['_id']))
             
             formatted_date = appointment['datetime'].strftime("%A, %B %d at %I:%M %p")
-            logger.info(f"✅ Appointment cancelled")
             
             response = f"I've cancelled your appointment on {formatted_date}. Anything else?"
 
@@ -672,7 +661,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return response
             
         except Exception as e:
-            logger.error(f"❌ Error cancelling appointment: {e}", exc_info=True)
+            logger.error(f"[cancel_appointment] Error: {e}")
             response = "I'm sorry, I couldn't cancel that appointment right now. Please try again."
             await self._say_response(context, response)
             return response
@@ -687,10 +676,10 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             new_time: New time (HH:MM format)  
             new_purpose: New purpose for the appointment
         """
-        logger.info(f"✏️  modify_appointment: {appointment_id}")
+        logger.debug(f"[modify_appointment] {appointment_id}")
         
         if not self.context.user_id:
-            logger.warning("⚠️  Cannot modify appointment: User not identified")
+            logger.warning("[modify_appointment] User not identified")
             response = "I need to identify you first. Could you please provide your phone number?"
             await self._say_response(context, response)
             return None
@@ -751,8 +740,6 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
                 }
             )
             
-            logger.info(f"✅ Appointment modified")
-            
             if 'datetime' in updates:
                 new_date_formatted = updates['datetime'].strftime("%A, %B %d at %I:%M %p")
                 response = f"Updated! Your appointment is now {new_date_formatted}."
@@ -766,7 +753,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             return response
             
         except Exception as e:
-            logger.error(f"❌ Error modifying appointment: {e}", exc_info=True)
+            logger.error(f"[modify_appointment] Error: {e}")
             response = "I'm sorry, I couldn't modify that appointment right now. Please try again."
             await self._say_response(context, response)
             return response
@@ -775,7 +762,7 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
     async def end_conversation(self, context: RunContext) -> str:
         """End the conversation and generate a summary.
         """
-        logger.info("👋 end_conversation")
+        logger.debug("[end_conversation]")
         
         try:
             # Generate enhanced conversation summary using the tracker
@@ -784,9 +771,8 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             # Save summary to database
             if self.context.user_id:
                 await self.db.save_conversation_summary(summary_data)
-                logger.debug(f"✅ Conversation summary saved")
             else:
-                logger.warning("⚠️  No user ID available, skipping summary save")
+                logger.warning("[end_conversation] No user ID, skipping summary save")
             
             # Send summary to frontend
             summary_event = {
@@ -800,22 +786,10 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
             
             response = "Thank you for using our appointment booking service! Have a great day!"
             await self._say_response(context, response)
-            logger.info(
-                "Final context | user=%s | agent=%s | tool=%s",
-                self.context.last_user_message,
-                self.context.last_agent_message,
-                self.context.last_tool_call,
-            )
             return None
             
         except Exception as e:
-            logger.error(f"❌ Error ending conversation: {e}", exc_info=True)
+            logger.error(f"[end_conversation] Error: {e}")
             response = "Thank you for using our appointment booking service! Have a great day!"
             await self._say_response(context, response)
-            logger.info(
-                "Final context | user=%s | agent=%s | tool=%s",
-                self.context.last_user_message,
-                self.context.last_agent_message,
-                self.context.last_tool_call,
-            )
             return None

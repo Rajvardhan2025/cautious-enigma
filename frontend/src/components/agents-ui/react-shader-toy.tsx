@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 const PRECISIONS = ['lowp', 'mediump', 'highp'];
 const FS_MAIN_SHADER = `\nvoid main(void){
     vec4 color = vec4(0.0,0.0,0.0,1.0);
@@ -133,9 +133,11 @@ const uniformTypeToGLSLType = (t: string) => {
     case 'Matrix4fv':
       return 'mat4';
     default:
-      console.error(
-        log(`The uniform type "${t}" is not valid, please make sure your uniform type is valid`),
-      );
+      if (import.meta.env.DEV) {
+        console.error(
+          log(`The uniform type "${t}" is not valid, please make sure your uniform type is valid`),
+        );
+      }
   }
 };
 
@@ -222,11 +224,13 @@ class Texture {
       this.pow2canvas.height = 2 ** Math.floor(Math.log(image.height) / Math.LN2);
       const context = this.pow2canvas.getContext('2d');
       context?.drawImage(image, 0, 0, this.pow2canvas.width, this.pow2canvas.height);
-      console.warn(
-        log(
-          `Image is not power of two ${image.width} x ${image.height}. Resized to ${this.pow2canvas.width} x ${this.pow2canvas.height};`,
-        ),
-      );
+      if (import.meta.env.DEV) {
+        console.warn(
+          log(
+            `Image is not power of two ${image.width} x ${image.height}. Resized to ${this.pow2canvas.width} x ${this.pow2canvas.height};`,
+          ),
+        );
+      }
       return this.pow2canvas as T;
     }
     return image;

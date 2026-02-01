@@ -48,7 +48,7 @@ async def create_session(request: SessionRequest):
         participant_name = request.participantName or generate_participant_name()
         use_avatar = True if request.useAvatar is None else bool(request.useAvatar)
         
-        logger.info(f"Creating session - Room: {room_name}, Participant: {participant_name}")
+        logger.info(f"[Session] Creating room: {room_name}")
         
         # Initialize LiveKit API client
         livekit_api = api.LiveKitAPI(
@@ -68,9 +68,8 @@ async def create_session(request: SessionRequest):
                     metadata=json.dumps({"use_avatar": use_avatar}),
                 )
             )
-            logger.info(f"Created room: {room_name}")
         except Exception as e:
-            logger.error(f"Failed to create room: {e}")
+            logger.error(f"[Session] Room creation failed: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to create room: {str(e)}")
         
         # Dispatch agent to the room
@@ -81,10 +80,8 @@ async def create_session(request: SessionRequest):
                     room=room_name,
                 )
             )
-            logger.info(f"Dispatched agent to room: {room_name}")
-            logger.info(f"Dispatch response: {dispatch_response}")
         except Exception as e:
-            logger.error(f"Failed to dispatch agent: {e}", exc_info=True)
+            logger.error(f"[Session] Agent dispatch failed: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to dispatch agent: {str(e)}")
         
         # Generate access token for participant
@@ -98,8 +95,6 @@ async def create_session(request: SessionRequest):
                 can_subscribe=True,
             )).to_jwt()
         
-        logger.info(f"Generated token for {participant_name} in room {room_name}")
-        
         await livekit_api.aclose()
         
         return SessionResponse(
@@ -112,7 +107,7 @@ async def create_session(request: SessionRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating session: {e}")
+        logger.error(f"[Session] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -132,14 +127,14 @@ async def livekit_webhook(
         token = authorization.replace("Bearer ", "")
         event = receiver.receive(body, token)
     except Exception as e:
-        logger.error(f"Webhook verification failed: {e}")
+        logger.error(f"[Webhook] Verification failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid webhook")
 
     # Basic lifecycle handling
     event_type = event.event
     room_name = event.room.name if event.room else None
     identity = event.participant.identity if event.participant else None
-    logger.info(f"LiveKit webhook: {event_type} room={room_name} identity={identity}")
+    logger.debug(f"[Webhook] {event_type} room={room_name} identity={identity}")
 
     # If the user leaves, aggressively delete the room to terminate avatar sessions
     if event_type == "participant_left" and identity and not identity.startswith("agent"):
@@ -152,9 +147,8 @@ async def livekit_webhook(
             )
             if room_name:
                 await livekit_api.room.delete_room(api.DeleteRoomRequest(room=room_name))
-                logger.info(f"Room deleted from webhook: {room_name}")
             await livekit_api.aclose()
         except Exception as e:
-            logger.error(f"Webhook room delete failed: {e}")
+            logger.error(f"[Webhook] Room delete failed: {e}")
 
     return {"ok": True}

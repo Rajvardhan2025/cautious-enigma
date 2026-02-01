@@ -47,10 +47,9 @@ const validateConfig = () => {
   }
   
   if (errors.length > 0) {
-    console.error('Configuration errors:', errors);
-    // Don't throw in production, just log warnings
+    // Only log in development mode
     if (import.meta.env.DEV) {
-      console.warn('Running with incomplete configuration in development mode');
+      console.warn('[Config] Running with incomplete configuration');
     }
   }
 };

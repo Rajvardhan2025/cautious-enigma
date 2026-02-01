@@ -32,7 +32,6 @@ function ChooseAvatarPage() {
                 },
             });
         } catch (err) {
-            console.error('Error creating session:', err);
             const errorMessage = handleApiError(err);
             toast.error('Failed to create session', { 
                 id: toastId,

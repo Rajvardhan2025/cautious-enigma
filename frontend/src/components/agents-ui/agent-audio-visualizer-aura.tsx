@@ -22,9 +22,12 @@ function hexToRgb(hexColor: string) {
       return color;
     }
   } catch (error) {
-    console.error(
-      `Invalid hex color '${hexColor}'.\nFalling back to default color '${DEFAULT_COLOR}'.`,
-    );
+    // Silently handle color parsing errors in production
+    if (import.meta.env.DEV) {
+      console.error(
+        `Invalid hex color '${hexColor}'.\nFalling back to default color '${DEFAULT_COLOR}'.`,
+      );
+    }
   }
 
   return hexToRgb(DEFAULT_COLOR);
@@ -322,10 +325,14 @@ function AuraShader({
           uColor: { type: '3fv', value: rgbColor ?? [0, 0.7, 1] },
         }}
         onError={(error) => {
-          console.error('Shader error:', error);
+          if (import.meta.env.DEV) {
+            console.error('[Shader] Error:', error);
+          }
         }}
         onWarning={(warning) => {
-          console.warn('Shader warning:', warning);
+          if (import.meta.env.DEV) {
+            console.warn('[Shader] Warning:', warning);
+          }
         }}
         style={{ width: '100%', height: '100%' }}
       />

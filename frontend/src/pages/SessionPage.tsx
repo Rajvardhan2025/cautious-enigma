@@ -93,10 +93,8 @@ function SessionPage() {
         serverUrl={url}
         data-lk-theme="default"
         style={{ height: '100vh' }}
-        onConnected={() => console.log('Connected to room:', roomName)}
         onDisconnected={handleDisconnect}
         onError={(error) => {
-          console.error('Room error:', error);
           setError(error.message);
         }}
       >

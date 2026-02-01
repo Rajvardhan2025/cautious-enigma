@@ -1,4 +1,3 @@
-import React from 'react';
 import { ConnectionState } from 'livekit-client';
 import { Wifi, WifiOff, Loader, CheckCircle, AlertCircle } from 'lucide-react';
 
