@@ -57,9 +57,9 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         duration: Infinity,
       });
     } else if (isAgentConnected && connectingToastRef.current !== null) {
-      toast.success('Agent connected!', { 
+      toast.success('Agent connected!', {
         id: connectingToastRef.current,
-        duration: 2000 
+        duration: 2000
       });
       connectingToastRef.current = null;
     }
@@ -70,34 +70,79 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
     const checkForAgent = () => {
       const participants = Array.from(room.remoteParticipants.values());
-      const agentPresent = participants.some(p =>
-        APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
-          p.identity.toLowerCase().includes(keyword)
-        )
-      );
-      if (agentPresent) {
-        console.log('Agent already in room');
-        setIsAgentConnected(true);
+      console.log('All participants in room:', participants.map(p => ({ identity: p.identity, name: p.name })));
+
+      // When using avatar, we need both voice agent and avatar agent
+      if (useAvatar) {
+        const hasVoiceAgent = participants.some(p => 
+          p.identity.toLowerCase().includes('voice') || 
+          p.identity.toLowerCase().includes('agent')
+        );
+        const hasAvatarAgent = participants.some(p => 
+          p.identity.toLowerCase().includes('bey') || 
+          p.identity.toLowerCase().includes('avatar')
+        );
+        
+        if (hasVoiceAgent && hasAvatarAgent) {
+          console.log('Both voice agent and avatar agent detected in room');
+          setIsAgentConnected(true);
+        } else {
+          console.log(`Waiting for agents - Voice: ${hasVoiceAgent}, Avatar: ${hasAvatarAgent}`);
+        }
+      } else {
+        // Without avatar, just need the voice agent
+        const agentPresent = participants.some(p => {
+          const matchesKeyword = APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
+            p.identity.toLowerCase().includes(keyword)
+          );
+          return matchesKeyword;
+        });
+
+        if (agentPresent) {
+          console.log('Voice agent detected in room');
+          setIsAgentConnected(true);
+        }
       }
     };
 
     checkForAgent();
 
     const handleParticipantConnected = (participant: Participant) => {
-      console.log('Participant connected:', participant.identity);
-      if (APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
-        participant.identity.toLowerCase().includes(keyword)
-      )) {
-        setIsAgentConnected(true);
-      }
+      console.log('Participant connected:', { identity: participant.identity, name: participant.name, isLocal: participant.isLocal });
+      
+      // Re-check agent status whenever a participant connects
+      checkForAgent();
     };
 
     const handleParticipantDisconnected = (participant: Participant) => {
       console.log('Participant disconnected:', participant.identity);
-      if (APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
-        participant.identity.toLowerCase().includes(keyword)
-      )) {
-        setIsAgentConnected(false);
+      
+      // Re-check agent status when someone disconnects
+      const participants = Array.from(room.remoteParticipants.values());
+      
+      if (useAvatar) {
+        const hasVoiceAgent = participants.some(p => 
+          p.identity.toLowerCase().includes('voice') || 
+          p.identity.toLowerCase().includes('agent')
+        );
+        const hasAvatarAgent = participants.some(p => 
+          p.identity.toLowerCase().includes('bey') || 
+          p.identity.toLowerCase().includes('avatar')
+        );
+        
+        if (!hasVoiceAgent || !hasAvatarAgent) {
+          setIsAgentConnected(false);
+        }
+      } else {
+        const agentPresent = participants.some(p => 
+          APP_CONSTANTS.AGENT_IDENTITY_KEYWORDS.some(keyword =>
+            p.identity.toLowerCase().includes(keyword)
+          )
+        );
+        
+        if (!agentPresent) {
+          setIsAgentConnected(false);
+        }
       }
     };
 
@@ -129,7 +174,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
       room.off(RoomEvent.DataReceived, handleDataReceived);
     };
-  }, [room, onToolCall, onConversationEnd, onEndCall]);
+  }, [room, onToolCall, onConversationEnd, onEndCall, useAvatar]);
 
   useEffect(() => {
     audioTracks.forEach(track => {
