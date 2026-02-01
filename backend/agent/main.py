@@ -244,10 +244,10 @@ async def voice_appointment_agent(ctx: JobContext):
         
         logger.info("✅ Agent session started successfully")
         
-        # Send initial greeting
+        # Send initial greeting with better introduction flow
         logger.info("👋 Sending initial greeting to user")
         await session.say(
-            "Hi! I'm your appointment assistant. What's your phone number?",
+            "Hi there! I'm Alya, your appointment scheduling assistant. I'm here to help you book, reschedule, or manage your appointments. What can I help you with today?",
             allow_interruptions=True,
         )
         

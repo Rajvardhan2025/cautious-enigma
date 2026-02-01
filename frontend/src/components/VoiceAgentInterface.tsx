@@ -11,7 +11,6 @@ import {
   Participant
 } from 'livekit-client';
 import { toast } from 'sonner';
-import { Toaster } from '@/components/ui/sonner';
 
 import { AgentAudioVisualizerAura } from '@/components/agents-ui/agent-audio-visualizer-aura';
 import LiveTranscript from './LiveTranscript';
@@ -208,8 +207,6 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
-      <Toaster position="top-center" />
-      
       {/* Avatar Initializing Modal */}
 
       {/* Left Side - Avatar & Call Controls */}

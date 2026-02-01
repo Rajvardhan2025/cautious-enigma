@@ -14,6 +14,7 @@ from livekit.agents import (
 
 from core.database import DatabaseManager
 from core.models import Appointment
+from core.summary_service import ConversationTracker, SummaryGenerator
 
 logger = logging.getLogger("agent.tools")
 
@@ -34,15 +35,23 @@ class ConversationContext:
     last_agent_message: Optional[str] = None
     last_tool_call: Optional[Dict] = None
     
+    # Add conversation tracker for enhanced summaries
+    tracker: Optional[ConversationTracker] = None
+    
     def __post_init__(self):
         if self.conversation_history is None:
             self.conversation_history = []
         if self.user_preferences is None:
             self.user_preferences = []
+        if self.tracker is None:
+            self.tracker = ConversationTracker()
 
 
 class VoiceAppointmentAgent(Agent):
     def __init__(self, user_context: Optional[Dict] = None) -> None:
+        # Initialize conversation context with tracker
+        self.context = ConversationContext()
+        
         # Build instructions with optional user context
         base_instructions = """# Identity
 
@@ -264,6 +273,15 @@ Remember: You're having a natural conversation, not reading a script."""
                 self.context.user_phone = clean_phone
                 self.context.user_name = user.get('name') or 'User'
                 
+                # Track user identification
+                self.context.tracker.user_id = self.context.user_id
+                self.context.tracker.user_phone = clean_phone
+                self.context.tracker.user_name = self.context.user_name
+                self.context.tracker.add_event('user_identified', {
+                    'returning_user': True,
+                    'has_name': bool(user.get('name'))
+                })
+                
                 logger.info(f"✅ User found: {self.context.user_name}")
                 if not user.get('name') or user.get('name') == 'User':
                     response = "Thanks! What's your name?"
@@ -283,6 +301,15 @@ Remember: You're having a natural conversation, not reading a script."""
                 self.context.user_id = str(user_id)
                 self.context.user_phone = clean_phone
                 self.context.user_name = 'User'
+                
+                # Track new user creation
+                self.context.tracker.user_id = self.context.user_id
+                self.context.tracker.user_phone = clean_phone
+                self.context.tracker.user_name = 'User'
+                self.context.tracker.add_event('user_identified', {
+                    'returning_user': False,
+                    'new_user_created': True
+                })
                 
                 logger.info(f"✅ New user created")
                 response = "Thanks! What's your name?"
@@ -317,6 +344,10 @@ Remember: You're having a natural conversation, not reading a script."""
             self.context.user_name = clean_name
             if self.context.user_id:
                 await self.db.update_user(self.context.user_id, {"name": clean_name})
+            
+            # Track name update
+            self.context.tracker.user_name = clean_name
+            self.context.tracker.add_event('name_saved', {'name': clean_name})
 
             response = (
                 f"Thanks, {clean_name}! What time tomorrow works for you—"
@@ -350,6 +381,10 @@ Remember: You're having a natural conversation, not reading a script."""
 
             if clean_pref not in self.context.user_preferences:
                 self.context.user_preferences.append(clean_pref)
+            
+            # Track preference
+            if clean_pref not in self.context.tracker.user_preferences:
+                self.context.tracker.user_preferences.append(clean_pref)
 
             response = "Got it. Anything else?"
             await self._send_tool_call_event(context, "add_user_preference", {"preference": clean_pref}, response)
@@ -502,6 +537,13 @@ Remember: You're having a natural conversation, not reading a script."""
                 'purpose': purpose
             }
             
+            # Track appointment booking
+            self.context.tracker.track_appointment_booked({
+                'date': normalized_date,
+                'time': self._format_time_ampm(normalized_time),
+                'purpose': purpose
+            })
+            
             logger.info(f"✅ Appointment booked: {normalized_date} {normalized_time}")
             
             response = (
@@ -552,6 +594,9 @@ Remember: You're having a natural conversation, not reading a script."""
                     upcoming.append(apt)
                 else:
                     past.append(apt)
+            
+            # Track appointments viewed
+            self.context.tracker.track_appointment_viewed(upcoming)
             
             response_parts = []
             
@@ -620,6 +665,9 @@ Remember: You're having a natural conversation, not reading a script."""
             
             # Cancel the appointment
             await self.db.update_appointment_status(appointment['_id'], 'cancelled')
+            
+            # Track cancellation
+            self.context.tracker.track_appointment_cancelled(str(appointment['_id']))
             
             formatted_date = appointment['datetime'].strftime("%A, %B %d at %I:%M %p")
             logger.info(f"✅ Appointment cancelled")
@@ -700,6 +748,16 @@ Remember: You're having a natural conversation, not reading a script."""
             # Update the appointment
             await self.db.update_appointment(appointment['_id'], updates)
             
+            # Track modification
+            self.context.tracker.track_appointment_modified(
+                str(appointment['_id']),
+                {
+                    'date': updates.get('date'),
+                    'time': updates.get('time'),
+                    'purpose': updates.get('purpose')
+                }
+            )
+            
             logger.info(f"✅ Appointment modified")
             
             if 'datetime' in updates:
@@ -726,39 +784,8 @@ Remember: You're having a natural conversation, not reading a script."""
         logger.info("👋 end_conversation")
         
         try:
-            # Generate conversation summary
-            summary_data = {
-                'user_id': self.context.user_id,
-                'user_phone': self.context.user_phone,
-                'conversation_date': datetime.utcnow(),
-                'appointments_discussed': [],
-                'user_preferences': self.context.user_preferences,
-                'summary_text': ""
-            }
-            
-            # Add any appointments from this conversation
-            if self.context.pending_appointment:
-                summary_data['appointments_discussed'].append(self.context.pending_appointment)
-            
-            # Generate summary text
-            summary_parts = []
-
-            if self.context.user_name and self.context.user_name != 'User':
-                summary_parts.append(f"Spoke with {self.context.user_name}")
-
-            if self.context.pending_appointment:
-                apt = self.context.pending_appointment
-                purpose = apt.get('purpose') or 'appointment'
-                summary_parts.append(f"Booked a {purpose} on {apt['date']} at {apt['time']}")
-            else:
-                summary_parts.append("Discussed appointment options")
-
-            if self.context.user_preferences:
-                summary_parts.append(
-                    f"Preferences: {', '.join(self.context.user_preferences)}"
-                )
-            
-            summary_data['summary_text'] = ". ".join(summary_parts)
+            # Generate enhanced conversation summary using the tracker
+            summary_data = SummaryGenerator.generate_summary(self.context.tracker)
             
             # Save summary to database
             if self.context.user_id:

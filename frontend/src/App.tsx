@@ -3,6 +3,7 @@ import HomePage from './pages/HomePage';
 import ChooseAvatarPage from './pages/ChooseAvatarPage';
 import SessionPage from './pages/SessionPage';
 import { ROUTES } from './config/constants';
+import { Toaster } from './components/ui/sonner';
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path={ROUTES.CHOOSE_AVATAR} element={<ChooseAvatarPage />} />
         <Route path={ROUTES.SESSION} element={<SessionPage />} />
       </Routes>
+      <Toaster position='top-left'/>
     </Router>
   );
 }

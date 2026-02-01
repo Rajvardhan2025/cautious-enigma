@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Info } from 'lucide-react';
+import { toast } from 'sonner';
 import { ROUTES } from '../config/constants';
 import { createSession, handleApiError } from '../lib/api';
 import { AnimatedOrb } from '../components/AnimatedOrb';
@@ -14,8 +15,13 @@ function ChooseAvatarPage() {
         setIsLoading(true);
         setError(null);
 
+        const toastId = toast.loading('Initializing session...', {
+            description: useAvatar ? 'Setting up your avatar experience' : 'Preparing your voice session',
+        });
+
         try {
             const session = await createSession(undefined, useAvatar);
+            toast.success('Session ready!', { id: toastId });
             navigate(ROUTES.SESSION, {
                 state: {
                     token: session.token,
@@ -27,7 +33,12 @@ function ChooseAvatarPage() {
             });
         } catch (err) {
             console.error('Error creating session:', err);
-            setError(handleApiError(err));
+            const errorMessage = handleApiError(err);
+            toast.error('Failed to create session', { 
+                id: toastId,
+                description: errorMessage 
+            });
+            setError(errorMessage);
             setIsLoading(false);
         }
     };
