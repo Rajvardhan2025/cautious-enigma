@@ -33,33 +33,89 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ className = '' }) => {
 
             const processStream = async () => {
                 try {
-                    const text = await reader.readAll();
-                    console.log('[LiveTranscript] Transcription text:', text);
+                    const segmentId = reader.info?.attributes?.['lk.segment_id'] || Date.now().toString();
+                    const messageId = `trans-${participantIdentity}-${segmentId}`;
+                    let buffer = '';
+
+                    const pushInterim = () => {
+                        setTranscriptionMessages(prev => {
+                            const existingIndex = prev.findIndex(m => m.id === messageId);
+                            const nextMessage: TranscriptMessage = {
+                                id: messageId,
+                                from: {
+                                    identity: participantIdentity,
+                                    name: participants.find(p => p.identity === participantIdentity)?.name,
+                                },
+                                message: buffer,
+                                timestamp: Date.now(),
+                                source: 'transcription',
+                                isFinal: false,
+                            };
+
+                            if (existingIndex >= 0) {
+                                const updated = [...prev];
+                                updated[existingIndex] = nextMessage;
+                                return updated;
+                            }
+
+                            return [...prev, nextMessage];
+                        });
+                    };
+
+                    if (reader && typeof reader.read === 'function') {
+                        while (true) {
+                            const chunk = await reader.read();
+                            if (!chunk) break;
+                            if (typeof chunk === 'string') {
+                                buffer += chunk;
+                            } else {
+                                if (chunk.done) break;
+                                if (chunk.value) {
+                                    buffer += chunk.value;
+                                }
+                            }
+
+                            if (buffer.length > 0) {
+                                pushInterim();
+                            }
+                        }
+                    } else if (reader && typeof reader[Symbol.asyncIterator] === 'function') {
+                        for await (const chunk of reader as AsyncIterable<string>) {
+                            if (chunk) {
+                                buffer += chunk;
+                                pushInterim();
+                            }
+                        }
+                    } else if (reader && typeof reader.readAll === 'function') {
+                        const text = await reader.readAll();
+                        if (text) {
+                            buffer = text;
+                            pushInterim();
+                        }
+                    }
 
                     const isFinal = reader.info?.attributes?.['lk.transcription_final'] === 'true';
-                    const segmentId = reader.info?.attributes?.['lk.segment_id'] || Date.now().toString();
-
                     setTranscriptionMessages(prev => {
-                        // Remove interim message with same segment ID if this is final
-                        let updated = prev;
-                        if (isFinal) {
-                            updated = updated.filter(m => !m.id.includes(segmentId));
-                        }
-
-                        // Add the new message
-                        updated = [...updated, {
-                            id: `trans-${participantIdentity}-${segmentId}`,
+                        const existingIndex = prev.findIndex(m => m.id === messageId);
+                        const nextMessage: TranscriptMessage = {
+                            id: messageId,
                             from: {
                                 identity: participantIdentity,
                                 name: participants.find(p => p.identity === participantIdentity)?.name,
                             },
-                            message: text,
+                            message: buffer,
                             timestamp: Date.now(),
                             source: 'transcription',
                             isFinal,
-                        }];
+                        };
 
-                        return updated;
+                        if (existingIndex >= 0) {
+                            const updated = [...prev];
+                            updated[existingIndex] = nextMessage;
+                            return updated;
+                        }
+
+                        return [...prev, nextMessage];
                     });
                 } catch (error) {
                     console.error('[LiveTranscript] Error reading transcription stream:', error);

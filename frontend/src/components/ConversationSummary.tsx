@@ -7,7 +7,6 @@ import {
   MessageSquare, 
   CheckCircle,
   Download,
-  Share
 } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 
@@ -46,29 +45,6 @@ const ConversationSummary: React.FC<ConversationSummaryProps> = ({ summary, onCl
     URL.revokeObjectURL(url);
   };
 
-  const handleShare = async () => {
-    const summaryText = generateSummaryText(summary);
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Conversation Summary',
-          text: summaryText,
-        });
-      } catch (error) {
-        console.log('Error sharing:', error);
-        copyToClipboard(summaryText);
-      }
-    } else {
-      copyToClipboard(summaryText);
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Summary copied to clipboard!');
-    });
-  };
 
   const generateSummaryText = (summary: ConversationSummaryData): string => {
     let text = `CONVERSATION SUMMARY\n`;
@@ -226,13 +202,6 @@ const ConversationSummary: React.FC<ConversationSummaryProps> = ({ summary, onCl
             Generated on {formatDate(new Date())}
           </div>
           <div className="flex space-x-3">
-            <button
-              onClick={handleShare}
-              className="flex items-center space-x-2 px-4 py-2 text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              <Share className="w-4 h-4" />
-              <span>Share</span>
-            </button>
             <button
               onClick={handleDownload}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"

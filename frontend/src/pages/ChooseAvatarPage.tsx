@@ -67,9 +67,6 @@ function ChooseAvatarPage() {
                                     Start the conversation instantly with voice only.
                                 </p>
                             </div>
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                                <span className="text-sm font-semibold">0s</span>
-                            </div>
                         </div>
                         <div className="mt-6 inline-flex items-center text-sm font-medium text-blue-600">
                             Start now

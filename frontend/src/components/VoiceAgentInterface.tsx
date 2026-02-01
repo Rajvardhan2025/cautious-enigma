@@ -133,40 +133,41 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
   }, [useAvatar, avatarVideoTrack, isAgentConnected]);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
-
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {useAvatar && isAvatarInitializing && !avatarVideoTrack && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-xl p-6 w-[420px] max-w-[90%] text-center">
-              <div className="text-lg font-semibold text-gray-800">Initializing avatar…</div>
-              <p className="text-sm text-gray-600 mt-2">
-                You can start the conversation now and enable the avatar later.
-              </p>
-              <div className="mt-4 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setUseAvatar(false)}
-                  className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium"
-                >
-                  Continue without avatar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAvatarInitializing(false)}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
-                >
-                  Keep waiting
-                </button>
-              </div>
+    <div className="h-screen flex overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Avatar Initializing Modal */}
+      {useAvatar && isAvatarInitializing && !avatarVideoTrack && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-[420px] max-w-[90%] text-center">
+            <div className="text-lg font-semibold text-gray-800">Initializing avatar…</div>
+            <p className="text-sm text-gray-600 mt-2">
+              You can start the conversation now and enable the avatar later.
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setUseAvatar(false)}
+                className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium"
+              >
+                Continue without avatar
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAvatarInitializing(false)}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+              >
+                Keep waiting
+              </button>
             </div>
           </div>
-        )}
-        {/* Main Area - Avatar & Status */}
-        <div className="flex-1 flex items-center justify-center p-8 pb-32">
+        </div>
+      )}
+
+      {/* Left Side - 60% - Avatar & Call Controls */}
+      <div className="w-[60%] flex flex-col items-center justify-center p-8 relative">
+        {/* Avatar Display */}
+        <div className="flex-1 flex items-center justify-center">
           {avatarVideoTrack ? (
-            <div className="w-[420px] h-[420px] rounded-3xl overflow-hidden shadow-2xl border border-white/60 bg-black">
+            <div className="w-[480px] h-[480px] rounded-3xl overflow-hidden shadow-2xl border border-white/60 bg-black">
               <VideoTrack
                 trackRef={avatarVideoTrack}
                 className="w-full h-full object-cover"
@@ -181,30 +182,8 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
           )}
         </div>
 
-        {/* Floating Chat Panel */}
-        <div className="absolute right-6 top-6 bottom-6 w-96 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-4 flex-shrink-0">
-            <h2 className="text-sm font-semibold text-white">Live Conversation</h2>
-            <p className="text-xs text-blue-100 mt-0.5">Real-time transcript</p>
-          </div>
-
-          <div className="flex-1 overflow-hidden bg-gradient-to-b from-gray-50 to-white">
-            <LiveTranscript className="h-full" />
-          </div>
-
-          <div className="border-t bg-white">
-            <div className="px-5 py-3">
-              <h3 className="text-sm font-semibold text-gray-700">Tool Calls</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Actions performed by the agent</p>
-            </div>
-            <div className="max-h-72 overflow-y-auto">
-              <ToolCallDisplay toolCalls={toolCalls} />
-            </div>
-          </div>
-        </div>
-
         {/* LiveKit Control Bar */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20" style={{ marginRight: '200px' }}>
+        <div className="pb-8">
           <ControlBar
             variation="minimal"
             controls={{
@@ -215,6 +194,30 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
               leave: true
             }}
           />
+        </div>
+      </div>
+
+      {/* Right Side - 40% - Chat Activity Section */}
+      <div className="w-[40%] bg-white shadow-2xl flex flex-col overflow-hidden border-l border-gray-200">
+
+        {/* Live Transcript Section */}
+        <div className="flex-1 flex flex-col overflow-hidden border-b border-gray-200">
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <p className="text-xs text-gray-500 mt-0.5">Transcript</p>
+          </div>
+          <div className="flex-1 overflow-hidden bg-white">
+            <LiveTranscript className="h-full" />
+          </div>
+        </div>
+
+        {/* Tool Calls Section */}
+        <div className="flex-shrink-0 bg-white">
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <p className="text-xs text-gray-500 mt-0.5">Actions performed by the agent</p>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            <ToolCallDisplay toolCalls={toolCalls} />
+          </div>
         </div>
       </div>
     </div>

@@ -27,6 +27,7 @@ class ConversationContext:
     user_id: Optional[str] = None
     user_phone: Optional[str] = None
     user_name: Optional[str] = None
+    user_preferences: List[str] = None
     conversation_history: List[Dict] = None
     pending_appointment: Optional[Dict] = None
     last_user_message: Optional[str] = None
@@ -36,6 +37,8 @@ class ConversationContext:
     def __post_init__(self):
         if self.conversation_history is None:
             self.conversation_history = []
+        if self.user_preferences is None:
+            self.user_preferences = []
 
 
 class VoiceAppointmentAgent(Agent):
@@ -58,8 +61,11 @@ CRITICAL RULES:
 
 Your job:
 1. Get phone number to identify user
-2. Help book, view, modify, or cancel appointments
-3. Confirm details clearly and briefly
+2. If the user's name is missing or unknown, ask for it and save it
+3. Help book, view, modify, or cancel appointments
+4. Confirm details clearly and briefly
+
+If the user mentions preferences (e.g., morning/afternoon, doctor, location), save them using the add_user_preference tool.
 
 When booking:
 - Appointments are ONLY available for tomorrow
@@ -207,18 +213,21 @@ Be warm, brief, and helpful.""",
             if user:
                 self.context.user_id = str(user['_id'])
                 self.context.user_phone = clean_phone
-                self.context.user_name = user.get('name', 'User')
+                self.context.user_name = user.get('name') or 'User'
                 
                 logger.info(f"✅ User found: {self.context.user_name}")
-                response = (
-                    f"Welcome back! What time tomorrow works for you—"
-                    f"{', '.join(['12 PM','3 PM','5 PM','6 PM','7 PM'])}?"
-                )
+                if not user.get('name') or user.get('name') == 'User':
+                    response = "Thanks! What's your name?"
+                else:
+                    response = (
+                        f"Welcome back, {self.context.user_name}! What time tomorrow works for you—"
+                        f"{', '.join(['12 PM','3 PM','5 PM','6 PM','7 PM'])}?"
+                    )
             else:
                 # Create new user
                 user_data = {
                     'phone': clean_phone,
-                    'name': 'User',
+                    'name': None,
                     'created_at': datetime.utcnow()
                 }
                 user_id = await self.db.create_user(user_data)
@@ -227,10 +236,7 @@ Be warm, brief, and helpful.""",
                 self.context.user_name = 'User'
                 
                 logger.info(f"✅ New user created")
-                response = (
-                    "Thanks! What time tomorrow works for you—"
-                    "12 PM, 3 PM, 5 PM, 6 PM, or 7 PM?"
-                )
+                response = "Thanks! What's your name?"
             
             # Send tool call event to frontend
             await self._send_tool_call_event(context, "identify_user", {"phone_number": phone_number}, response)
@@ -240,6 +246,70 @@ Be warm, brief, and helpful.""",
         except Exception as e:
             logger.error(f"❌ Error identifying user: {e}", exc_info=True)
             response = "Sorry, I couldn't find that number. Can you try again?"
+            await self._say_response(context, response)
+            return None
+
+    @function_tool
+    async def set_user_name(self, context: RunContext, name: str) -> str:
+        """Save the user's name for personalization and summaries.
+
+        Args:
+            name: The user's name
+        """
+        logger.info(f"👤 set_user_name: {name}")
+
+        try:
+            clean_name = name.strip()
+            if not clean_name:
+                response = "Sorry, I didn't catch your name. What should I call you?"
+                await self._say_response(context, response)
+                return None
+
+            self.context.user_name = clean_name
+            if self.context.user_id:
+                await self.db.update_user(self.context.user_id, {"name": clean_name})
+
+            response = (
+                f"Thanks, {clean_name}! What time tomorrow works for you—"
+                f"{', '.join(['12 PM','3 PM','5 PM','6 PM','7 PM'])}?"
+            )
+            await self._send_tool_call_event(context, "set_user_name", {"name": clean_name}, response)
+            await self._say_response(context, response)
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error setting user name: {e}", exc_info=True)
+            response = "Sorry, I couldn't save that name. What should I call you?"
+            await self._say_response(context, response)
+            return None
+
+    @function_tool
+    async def add_user_preference(self, context: RunContext, preference: str) -> str:
+        """Save a user preference mentioned during the conversation.
+
+        Args:
+            preference: The preference text to store
+        """
+        logger.info(f"⭐ add_user_preference: {preference}")
+
+        try:
+            clean_pref = preference.strip()
+            if not clean_pref:
+                response = "Sorry, I didn't catch that preference. Could you repeat it?"
+                await self._say_response(context, response)
+                return None
+
+            if clean_pref not in self.context.user_preferences:
+                self.context.user_preferences.append(clean_pref)
+
+            response = "Got it. Anything else?"
+            await self._send_tool_call_event(context, "add_user_preference", {"preference": clean_pref}, response)
+            await self._say_response(context, response)
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error saving preference: {e}", exc_info=True)
+            response = "Sorry, I couldn't save that preference."
             await self._say_response(context, response)
             return None
 
@@ -256,10 +326,18 @@ Be warm, brief, and helpful.""",
             normalized_date = self._normalize_date(date) if date else None
             tomorrow = self._tomorrow_date()
             allowed_slots = self._allowed_slots_for_date(tomorrow)
+            booked_slots = await self.db.get_booked_slots(tomorrow)
+            available_slots = [
+                slot for slot in allowed_slots
+                if f"{tomorrow} {slot['time']}" not in booked_slots
+            ]
 
-            response = (
-                f"Tomorrow I have {self._format_slots(allowed_slots)}. Which time works for you?"
-            )
+            if not available_slots:
+                response = "Sorry, tomorrow is fully booked. I can only book for tomorrow."
+            else:
+                response = (
+                    f"Tomorrow I have {self._format_slots(available_slots)}. Which time works for you?"
+                )
             
             await self._send_tool_call_event(context, "fetch_slots", {"date": normalized_date or date}, response)
             await self._say_response(context, response)
@@ -328,7 +406,22 @@ Be warm, brief, and helpful.""",
 
             if datetime_str in booked_slots:
                 logger.warning(f"⚠️  Slot {datetime_str} is already booked")
-                response = f"Sorry, {normalized_time} on {normalized_date} is taken. Want a different slot?"
+                allowed_slots = self._allowed_slots_for_date(normalized_date)
+                available_slots = [
+                    slot for slot in allowed_slots
+                    if f"{normalized_date} {slot['time']}" not in booked_slots
+                ]
+
+                if not available_slots:
+                    response = (
+                        "Sorry, tomorrow is fully booked. "
+                        "Would you like to check another day?"
+                    )
+                else:
+                    response = (
+                        f"Sorry, {self._format_time_ampm(normalized_time)} is taken. "
+                        f"I can do {self._format_slots(available_slots)}. Which time works?"
+                    )
                 await self._send_tool_call_event(
                     context,
                     "book_appointment",
@@ -341,6 +434,7 @@ Be warm, brief, and helpful.""",
             # Create appointment
             appointment_data = {
                 'user_id': self.context.user_id,
+                'contact_number': self.context.user_phone,
                 'date': normalized_date,
                 'time': normalized_time,
                 'datetime': datetime.strptime(f"{normalized_date} {normalized_time}", "%Y-%m-%d %H:%M"),
@@ -589,7 +683,7 @@ Be warm, brief, and helpful.""",
                 'user_phone': self.context.user_phone,
                 'conversation_date': datetime.utcnow(),
                 'appointments_discussed': [],
-                'user_preferences': [],
+                'user_preferences': self.context.user_preferences,
                 'summary_text': ""
             }
             
@@ -598,13 +692,22 @@ Be warm, brief, and helpful.""",
                 summary_data['appointments_discussed'].append(self.context.pending_appointment)
             
             # Generate summary text
-            summary_parts = [
-                f"Conversation with {self.context.user_name or 'User'} on {datetime.now().strftime('%B %d, %Y')}"
-            ]
-            
+            summary_parts = []
+
+            if self.context.user_name and self.context.user_name != 'User':
+                summary_parts.append(f"Spoke with {self.context.user_name}")
+
             if self.context.pending_appointment:
                 apt = self.context.pending_appointment
-                summary_parts.append(f"Booked appointment: {apt['date']} at {apt['time']} for {apt['purpose']}")
+                purpose = apt.get('purpose') or 'appointment'
+                summary_parts.append(f"Booked a {purpose} on {apt['date']} at {apt['time']}")
+            else:
+                summary_parts.append("Discussed appointment options")
+
+            if self.context.user_preferences:
+                summary_parts.append(
+                    f"Preferences: {', '.join(self.context.user_preferences)}"
+                )
             
             summary_data['summary_text'] = ". ".join(summary_parts)
             
