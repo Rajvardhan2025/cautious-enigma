@@ -58,6 +58,14 @@ class DatabaseManager:
                 [("user_id", 1), ("conversation_date", -1)]
             )
 
+            # Conversation messages indexes
+            await self.db.conversation_messages.create_index(
+                "conversation_id", unique=True
+            )
+            await self.db.conversation_messages.create_index(
+                [("user_id", 1), ("timestamp", -1)]
+            )
+
         except Exception as e:
             logger.error(f"[Database] Index creation error: {e}")
 
@@ -246,6 +254,32 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"[Database] Save conversation summary error: {e}")
             raise
+
+    async def save_conversation_messages(self, messages_data: Dict) -> ObjectId:
+        """Save all conversation messages for a session"""
+        await self.ensure_connected()
+
+        try:
+            result = await self.db.conversation_messages.insert_one(messages_data)
+            return result.inserted_id
+
+        except Exception as e:
+            logger.error(f"[Database] Save conversation messages error: {e}")
+            raise
+
+    async def get_conversation_messages(self, conversation_id: str) -> Optional[Dict]:
+        """Get all messages for a specific conversation"""
+        await self.ensure_connected()
+
+        try:
+            messages = await self.db.conversation_messages.find_one(
+                {"conversation_id": conversation_id}
+            )
+            return messages
+
+        except Exception as e:
+            logger.error(f"[Database] Get conversation messages error: {e}")
+            return None
 
     async def get_user_conversation_summaries(
         self, user_id: str, limit: int = 10

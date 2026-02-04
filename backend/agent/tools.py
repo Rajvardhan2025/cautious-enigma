@@ -1029,6 +1029,20 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
                 f"[end_conversation] Summary saved for user: {user_id_for_save}"
             )
 
+            # Save all conversation messages
+            messages_data = {
+                "conversation_id": self.context.conversation_id,
+                "user_id": user_id_for_save,
+                "user_phone": self.context.user_phone or "unknown",
+                "messages": self.context.message_history,
+                "timestamp": datetime.utcnow(),
+                "total_messages": len(self.context.message_history),
+            }
+            await self.db.save_conversation_messages(messages_data)
+            logger.info(
+                f"[end_conversation] {len(self.context.message_history)} messages saved for conversation: {self.context.conversation_id}"
+            )
+
             # Send summary to frontend
             summary_event = {"type": "conversation_summary", "summary": summary_data}
             await self._publish_data_event(context, summary_event)
