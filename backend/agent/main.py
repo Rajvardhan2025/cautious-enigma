@@ -13,6 +13,7 @@ from livekit.agents import (
     room_io,
 )
 from livekit.plugins import noise_cancellation, silero, deepgram, google, openai, bey
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from agent.tools import VoiceAppointmentAgent
 
@@ -104,9 +105,12 @@ async def voice_appointment_agent(ctx: JobContext):
         def on_participant_disconnected(participant: rtc.RemoteParticipant):
             logger.info(f"[Room] Participant left: {participant.identity}")
 
+        server_vad = silero.VAD.load()
+        turn_detector = MultilingualModel()
+
         # Set up voice AI pipeline with Deepgram and configurable LLM
         session = AgentSession(
-            # Use Deepgram for STT
+            turn_detection=turn_detector,
             stt=deepgram.STTv2(
                 model="flux-general-en",
                 eager_eot_threshold=0.4,
@@ -125,15 +129,18 @@ async def voice_appointment_agent(ctx: JobContext):
                     "7 PM",
                 ],
             ),
+            vad=server_vad,
             # Use configured LLM (Gemini, Cerebras, or OpenAI)
             llm=get_llm_instance(),
             # Use Deepgram for TTS
             tts=deepgram.TTS(
                 model="aura-2-asteria-en",
             ),
-            # VAD and turn detection
-            turn_detection="stt",
-            vad=silero.VAD.load(),
+            min_interruption_duration=0.5,
+            min_endpointing_delay=0.5,
+            max_endpointing_delay=3.0,
+            allow_interruptions=True,
+            resume_false_interruption=False,
         )
 
         # Add event listeners for session events
