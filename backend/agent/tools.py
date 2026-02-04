@@ -83,7 +83,7 @@ class UserData:
         self.message_history.append({"role": role, "content": content.strip()})
         # Keep only last N messages
         if len(self.message_history) > self.max_history_size:
-            self.message_history = self.message_history[-self.max_history_size:]
+            self.message_history = self.message_history[-self.max_history_size :]
         # Also update last message shortcuts
         if role == "user":
             self.last_user_message = content.strip()
@@ -164,7 +164,7 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
    - Did the user ask to see appointments? -> Call `retrieve_appointments`.
    - Did the user ask to book? -> Call `book_appointment` or ask for time if missing.
    - Do NOT restart from scratch. React to the user's actual intent.
-4. **Name Collection**: If name is missing, ask gently. After saving, **resume the previous task**.
+4. **Name Collection**: If name is missing, ASK the user "What's your name?" and **WAIT for their response**. Only call `set_user_name` AFTER the user provides their name. After saving, **resume the previous task**.
 
 # Output Style
 
@@ -193,6 +193,11 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
 - **NO EXCEPTIONS**: Don't ask "Are you sure?" or "Anything else?" when you detect goodbye patterns.
 - **IMMEDIATE ACTION**: Call `end_conversation` instantly when detected, with NO delay.
 - This will properly close the session and save the conversation summary.
+
+# Smart Appointment Cancellation
+- When user says "cancel the **latest**", "cancel the **most recent**", "cancel my **last** appointment", "cancel the **newest** one", etc., use `cancel_appointment` with `cancel_latest=true`.
+- These phrases indicate the most recent upcoming appointment should be cancelled without requiring date/time confirmation.
+- NEVER ask which appointment when these relative terms are used—let the tool handle it automatically.
 """
 
         # Add user information section if provided
@@ -245,7 +250,9 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
                 role="system",
                 content=recent_history,
             )
-            logger.debug(f"[Context] Injected {len(self.user_data.message_history)} messages into context")
+            logger.debug(
+                f"[Context] Injected {len(self.user_data.message_history)} messages into context"
+            )
 
         await self.update_chat_ctx(chat_ctx)
 
@@ -441,8 +448,9 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
                 ui_response = f"Welcome back, {self.context.user_name}!"
                 llm_response = f"User identified as {self.context.user_name}. Check conversation history for pending requests. Do NOT ask for phone again."
             else:
-                ui_response = "Thanks! Could I get your name?"
-                llm_response = "User identified but name is missing. Ask for name. Do NOT ask for phone again."
+                ui_response = "User identified. Name not on file."
+                # Important: Tell LLM to ASK the user, not assume a name
+                llm_response = f"New user created with phone {clean_phone}. NO name on file yet. You MUST ask the user 'What's your name?' and WAIT for their response before calling set_user_name. Do NOT assume or generate a name. Do NOT ask for phone again."
 
             # Send tool call event to frontend with UI-friendly message
             await self._send_tool_call_event(
@@ -809,15 +817,19 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
         appointment_id: str = None,
         date: str = None,
         time: str = None,
+        cancel_latest: bool = False,
     ) -> str:
-        """Cancel an appointment by ID or date/time.
+        """Cancel an appointment by ID, date/time, or latest appointment.
 
         Args:
             appointment_id: The appointment ID to cancel
             date: Appointment date (YYYY-MM-DD format)
             time: Appointment time (HH:MM format)
+            cancel_latest: If True, cancel the most recent upcoming appointment
         """
-        logger.debug(f"[cancel_appointment] {appointment_id or f'{date} {time}'}")
+        logger.debug(
+            f"[cancel_appointment] {appointment_id or f'{date} {time}' or ('latest' if cancel_latest else '')}"
+        )
 
         if not self.context.user_id:
             logger.warning("[cancel_appointment] User not identified")
@@ -828,7 +840,21 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
         try:
             appointment = None
 
-            if appointment_id:
+            if cancel_latest:
+                # Get all appointments and find the most recent upcoming one
+                appointments = await self.db.get_user_appointments(self.context.user_id)
+                if appointments:
+                    # Sort by datetime descending and get first upcoming one
+                    now = datetime.utcnow()
+                    upcoming = [
+                        apt
+                        for apt in appointments
+                        if apt["status"] != "cancelled" and apt["datetime"] > now
+                    ]
+                    if upcoming:
+                        upcoming.sort(key=lambda x: x["datetime"])
+                        appointment = upcoming[0]  # Most recent upcoming
+            elif appointment_id:
                 appointment = await self.db.get_appointment_by_id(
                     appointment_id, self.context.user_id
                 )
@@ -837,7 +863,7 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
                     self.context.user_id, date, time
                 )
             else:
-                response = "I need either the appointment ID or the date and time to cancel an appointment."
+                response = "I need either the appointment ID, date and time, or to know which appointment to cancel."
                 await self._say_response(context, response)
                 return None
 
@@ -846,7 +872,12 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
                 await self._send_tool_call_event(
                     context,
                     "cancel_appointment",
-                    {"appointment_id": appointment_id, "date": date, "time": time},
+                    {
+                        "appointment_id": appointment_id,
+                        "date": date,
+                        "time": time,
+                        "cancel_latest": cancel_latest,
+                    },
                     response,
                 )
                 await self._say_response(context, response)
@@ -857,7 +888,12 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
                 await self._send_tool_call_event(
                     context,
                     "cancel_appointment",
-                    {"appointment_id": appointment_id, "date": date, "time": time},
+                    {
+                        "appointment_id": appointment_id,
+                        "date": date,
+                        "time": time,
+                        "cancel_latest": cancel_latest,
+                    },
                     response,
                 )
                 await self._say_response(context, response)
@@ -876,7 +912,10 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
             )
 
             await self._send_tool_call_event(
-                context, "cancel_appointment", {"date": date, "time": time}, response
+                context,
+                "cancel_appointment",
+                {"date": date, "time": time, "cancel_latest": cancel_latest},
+                response,
             )
 
             # Return response for LLM to confirm
@@ -1019,14 +1058,17 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
         logger.info("[end_conversation] User initiated conversation end")
 
         try:
-            # Generate enhanced conversation summary using the tracker
-            summary_data = SummaryGenerator.generate_summary(self.context.tracker)
+            summary_data = await SummaryGenerator.generate_frontend_summary(
+                tracker=self.context.tracker,
+                messages=self.context.message_history,
+                ai_timeout=8.0,
+            )
 
             # Save summary to database - always save, use "unknown" if no user ID
             user_id_for_save = self.context.user_id or "unknown"
             await self.db.save_conversation_summary(summary_data)
             logger.info(
-                f"[end_conversation] Summary saved for user: {user_id_for_save}"
+                f"[end_conversation] Summary saved for user: {user_id_for_save} (type: {summary_data.get('summary_type')})"
             )
 
             # Save all conversation messages

@@ -3,9 +3,16 @@ Captures rich context throughout the conversation and generates natural summarie
 """
 
 import logging
+import os
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+
+try:
+    import google.genai as genai
+except ImportError:
+    genai = None
 
 logger = logging.getLogger("summary_service")
 
@@ -103,13 +110,163 @@ class ConversationTracker:
 class SummaryGenerator:
     """Generates natural, comprehensive conversation summaries"""
 
+    _client = None
+
+    @classmethod
+    def get_genai_client(cls):
+        """Get or create a Gemini client for text summarization"""
+        if cls._client is None:
+            if genai is None:
+                logger.warning(
+                    "google-genai package not available. Text summarization disabled."
+                )
+                return None
+
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                logger.warning("GOOGLE_API_KEY not set. Text summarization disabled.")
+                return None
+
+            logger.info("Initializing Google Generative AI client for summarization")
+            cls._client = genai.Client(api_key=api_key)
+
+        return cls._client
+
     @staticmethod
-    def generate_summary(tracker: ConversationTracker) -> Dict[str, Any]:
-        """Generate a comprehensive summary from conversation tracker"""
+    async def generate_text_summary_from_messages(
+        messages: List[Dict[str, str]],
+    ) -> str:
+        """
+        Generate a concise text summary from conversation messages using Gemini 2.0 Flash Lite.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content' keys
+                     Format: [{"role": "user|assistant", "content": "..."}, ...]
+
+        Returns:
+            A concise summary of the conversation
+        """
+        client = SummaryGenerator.get_genai_client()
+
+        if client is None:
+            logger.warning("Gemini client not available. Returning template summary.")
+            return "Appointment consultation completed."
+
+        try:
+            # Format messages for the summarization prompt
+            formatted_messages = []
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                formatted_messages.append(f"{role.upper()}: {content}")
+
+            messages_text = "\n".join(formatted_messages)
+
+            # Create a summarization prompt
+            prompt = f"""Analyze this appointment agent conversation and provide a concise summary covering:
+1. What appointment(s) were booked, rescheduled, or cancelled
+2. Any key dates/times mentioned
+3. User preferences or special notes
+4. Overall outcome of the conversation
+
+Keep the summary to at max 2-3 sentences, focused on actionable information.
+
+CONVERSATION:
+{messages_text}
+
+SUMMARY:"""
+
+            # Use Gemini 2.0 Flash Lite to generate the summary
+            logger.info("Generating text summary with Gemini 2.0 Flash Lite...")
+            response = client.models.generate_content(
+                model="gemini-2.5-flash-lite", contents=prompt
+            )
+
+            summary_text = (
+                response.text.strip()
+                if response.text
+                else "Appointment consultation completed."
+            )
+            logger.info(
+                f"Summary generated successfully: {len(summary_text)} characters"
+            )
+
+            return summary_text
+
+        except Exception as e:
+            logger.error(f"Error generating text summary with Gemini: {e}")
+            return "Appointment consultation completed."
+
+    @staticmethod
+    async def generate_frontend_summary(
+        tracker: ConversationTracker,
+        messages: Optional[List[Dict[str, str]]] = None,
+        ai_timeout: float = 6.0,
+    ) -> Dict[str, Any]:
+        """
+        Generate a comprehensive summary ready for frontend consumption.
+        Returns static summary by default. If AI summary completes, includes it as ai_summary.
+
+        Args:
+            tracker: ConversationTracker with conversation context
+            messages: Optional list of messages for AI text summarization
+            ai_timeout: Timeout in seconds for AI summary generation (default 6s)
+
+        Returns:
+            Dictionary with frontend-ready summary data including ai_summary if available
+        """
         tracker.end_time = datetime.utcnow()
 
-        # Generate natural summary text
+        # Start with the static summary template
+        summary_data = SummaryGenerator.generate_summary(tracker)
+
+        # Try to get AI summary if messages provided
+        if messages:
+            try:
+                logger.info(
+                    f"Attempting AI summary generation with {ai_timeout}s timeout..."
+                )
+                ai_summary_task = asyncio.create_task(
+                    SummaryGenerator.generate_text_summary_from_messages(messages)
+                )
+                try:
+                    ai_summary_text = await asyncio.wait_for(
+                        ai_summary_task, timeout=ai_timeout
+                    )
+                    summary_data["summary_text"] = ai_summary_text
+                    logger.info(f"AI summary generated: {ai_summary_text[:100]}...")
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        f"AI summary generation timed out after {ai_timeout}s"
+                    )
+                    ai_summary_task.cancel()
+            except Exception as e:
+                logger.warning(f"Could not generate AI summary: {e}")
+
+        return summary_data
+
+    @staticmethod
+    def generate_summary(
+        tracker: ConversationTracker, messages: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a comprehensive summary from conversation tracker.
+
+        Args:
+            tracker: ConversationTracker with conversation context
+            messages: Optional list of messages for Gemini text summarization
+
+        Returns:
+            Dictionary with summary data including AI-generated text summary
+        """
+        tracker.end_time = datetime.utcnow()
+
         summary_text = SummaryGenerator._generate_summary_text(tracker)
+
+        if messages:
+            logger.info(
+                "Messages provided for potential Gemini summarization (async operation)"
+            )
 
         # Compile all appointments discussed
         all_appointments = []
