@@ -1,6 +1,7 @@
 import logging
 import os
 import json
+import uuid
 from dotenv import load_dotenv
 
 from livekit import rtc
@@ -44,7 +45,7 @@ livekit_url = os.getenv("LIVEKIT_URL")
 
 def get_llm_instance():
     """Get LLM instance based on environment configuration."""
-    provider = os.getenv("LLM_PROVIDER", "gemini").lower()
+    provider = "gemini"
 
     if provider == "cerebras":
         model = os.getenv("CEREBRAS_MODEL", "llama3.1-8b")
@@ -122,11 +123,6 @@ async def voice_appointment_agent(ctx: JobContext):
                     "cancel",
                     "phone number",
                     "tomorrow",
-                    "12 PM",
-                    "3 PM",
-                    "5 PM",
-                    "6 PM",
-                    "7 PM",
                 ],
             ),
             vad=server_vad,
@@ -171,6 +167,10 @@ async def voice_appointment_agent(ctx: JobContext):
         avatar_id = os.getenv("BEY_AVATAR_ID")
         logger.info(f"[Avatar] Avatar ID: {avatar_id}")
 
+        # Generate unique conversation ID for this session
+        conversation_id = str(uuid.uuid4())
+        logger.info(f"[Session] Conversation ID: {conversation_id}")
+
         if ctx.room.metadata:
             try:
                 metadata = json.loads(ctx.room.metadata)
@@ -179,8 +179,10 @@ async def voice_appointment_agent(ctx: JobContext):
             except Exception as e:
                 logger.warning(f"[Metadata] Failed to parse: {e}")
 
-        # Create agent with optional user context
-        agent = VoiceAppointmentAgent(user_context=user_context)
+        # Create agent with optional user context and conversation ID
+        agent = VoiceAppointmentAgent(
+            user_context=user_context, conversation_id=conversation_id
+        )
 
         # Store agent reference for event handlers
         @session.on("user_speech_committed")
@@ -196,14 +198,17 @@ async def voice_appointment_agent(ctx: JobContext):
             room=ctx.room,
             room_options=room_io.RoomOptions(
                 audio_input=room_io.AudioInputOptions(
-                    noise_cancellation=lambda params: noise_cancellation.BVCTelephony()
-                    if params.participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-                    else noise_cancellation.BVC(),
+                    noise_cancellation=lambda params: (
+                        noise_cancellation.BVCTelephony()
+                        if params.participant.kind
+                        == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                        else noise_cancellation.BVC()
+                    ),
                 ),
                 text_output=True,
             ),
         )
-        
+
         logger.info("[Session] Started successfully")
 
         # Start Beyond Presence avatar after session starts
@@ -223,12 +228,6 @@ async def voice_appointment_agent(ctx: JobContext):
             except Exception as e:
                 logger.error(f"[Avatar] Failed to start: {e}")
 
-        # Send initial greeting
-        await session.say(
-            "Hi there! I'm Alya, your appointment scheduling assistant. I'm here to help you book, reschedule, or manage your appointments. What can I help you with today?",
-            allow_interruptions=True,
-        )
-        
     except Exception as e:
         logger.error(f"[Session] Fatal error: {e}", exc_info=True)
         raise
