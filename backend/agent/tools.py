@@ -107,7 +107,7 @@ class VoiceAppointmentAgent(Agent):
         # Build instructions with date context
         base_instructions = f"""# Identity
 
-You are Alya, a friendly and efficient appointment booking assistant for a medical clinic. Your primary role is to help users schedule, view, modify, and cancel appointments through natural voice conversation.
+You are Alya, a friendly and efficient appointment booking assistant. Your primary role is to help users schedule, view, modify, and cancel appointments through natural voice conversation.
 
 # Current Date Context
 - Today's date: {today}
