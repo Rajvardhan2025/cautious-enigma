@@ -157,6 +157,16 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
 # After Identifying User or Setting Name
 - IMMEDIATELY check conversation history for pending requests.
 - If a request is pending and you have all details, EXECUTE IT. Don't ask "What would you like to do?" again.
+
+# Ending the Conversation
+- **CRITICAL**: When the user says ANY of these phrases, IMMEDIATELY call `end_conversation`:
+  - "bye", "bye bye", "goodbye", "see you", "see you later", "talk to you later", "ttyl"
+  - "thank you", "thanks", "that's all", "that's it", "no more", "no thanks"
+  - "i'm done", "we're done", "that's all i needed", "nothing else"
+  - ANY variation of farewell, closing, or end of service
+- **NO EXCEPTIONS**: Don't ask "Are you sure?" or "Anything else?" when you detect goodbye patterns.
+- **IMMEDIATE ACTION**: Call `end_conversation` instantly when detected, with NO delay.
+- This will properly close the session and save the conversation summary.
 """
 
         # Add user information section if provided
@@ -971,17 +981,18 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
     @function_tool
     async def end_conversation(self, context: RunContext) -> str:
         """End the conversation and generate a summary."""
-        logger.debug("[end_conversation]")
+        logger.info("[end_conversation] User initiated conversation end")
 
         try:
             # Generate enhanced conversation summary using the tracker
             summary_data = SummaryGenerator.generate_summary(self.context.tracker)
 
-            # Save summary to database
-            if self.context.user_id:
-                await self.db.save_conversation_summary(summary_data)
-            else:
-                logger.warning("[end_conversation] No user ID, skipping summary save")
+            # Save summary to database - always save, use "unknown" if no user ID
+            user_id_for_save = self.context.user_id or "unknown"
+            await self.db.save_conversation_summary(summary_data)
+            logger.info(
+                f"[end_conversation] Summary saved for user: {user_id_for_save}"
+            )
 
             # Send summary to frontend
             summary_event = {"type": "conversation_summary", "summary": summary_data}
@@ -989,11 +1000,23 @@ You are Alya, a friendly and efficient appointment booking assistant for a medic
 
             # Signal frontend to end the call after showing summary
             await self._publish_data_event(context, {"type": "end_call"})
+            logger.info("[end_conversation] Sent end_call event to frontend")
 
             response = (
                 "Thank you for using our appointment booking service! Have a great day!"
             )
             await self._say_response(context, response)
+
+            # Close the session after a brief delay to allow response to be sent
+            import asyncio
+            await asyncio.sleep(0.5)
+            # Stop the agent session
+            try:
+                await self.session.aclose()
+                logger.info("[end_conversation] Session closed successfully")
+            except Exception as e:
+                logger.warning(f"[end_conversation] Could not close session: {e}")
+
             return None
 
         except Exception as e:
