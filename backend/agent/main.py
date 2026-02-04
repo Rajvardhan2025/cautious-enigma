@@ -139,27 +139,6 @@ async def voice_appointment_agent(ctx: JobContext):
             resume_false_interruption=False,
         )
 
-        # Add event listeners for session events
-        @session.on("user_speech_committed")
-        def on_user_speech(msg):
-            logger.debug(f"[User] {msg.text}")
-
-        @session.on("agent_speech_committed")
-        def on_agent_speech(msg):
-            logger.debug(f"[Agent] {msg.text}")
-
-        @session.on("agent_speech_interrupted")
-        def on_agent_interrupted(msg):
-            logger.debug(f"[Agent] Interrupted")
-
-        @session.on("function_calls_finished")
-        def on_function_finished(calls):
-            for call in calls:
-                if call.exception:
-                    logger.error(
-                        f"[Tool] {call.function_info.name} failed: {call.exception}"
-                    )
-
         # Extract user context from job metadata if available
         user_context = None
         use_avatar = False
@@ -184,14 +163,35 @@ async def voice_appointment_agent(ctx: JobContext):
             user_context=user_context, conversation_id=conversation_id
         )
 
-        # Store agent reference for event handlers
-        @session.on("user_speech_committed")
-        def on_user_speech_update(msg):
-            agent.context.last_user_message = msg.text
+        # Register session event handlers for message tracking
+        # Use correct LiveKit event types
+        @session.on("user_input_transcribed")
+        def on_user_input_transcribed(event):
+            if event.is_final:
+                logger.info(f"[User] {event.transcript}")
+                agent.context.add_message("user", event.transcript)
 
-        @session.on("agent_speech_committed")
-        def on_agent_speech_update(msg):
-            agent.context.last_agent_message = msg.text
+        @session.on("conversation_item_added")
+        def on_conversation_item_added(event):
+            # Track messages added to conversation (for agent/assistant messages)
+            item = event.item
+            # Only process ChatMessage items (type == "message")
+            if hasattr(item, 'type') and item.type == "message":
+                role = item.role if hasattr(item, 'role') else None
+                # Use text_content property for cleaner extraction
+                content = item.text_content if hasattr(item, 'text_content') else None
+                
+                if role == "assistant" and content:
+                    logger.info(f"[Agent] {content}")
+                    agent.context.add_message("assistant", content)
+
+
+        @session.on("function_tools_executed")
+        def on_function_finished(event):
+            for call, output in event.zipped():
+                if output and hasattr(output, 'error') and output.error:
+                    logger.error(f"[Tool] {call.name} failed: {output.error}")
+
 
         avatar = None
         if bey_api_key and avatar_id and use_avatar:

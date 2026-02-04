@@ -66,6 +66,8 @@ class UserData:
     last_user_message: Optional[str] = None
     last_agent_message: Optional[str] = None
     last_tool_call: Optional[Dict] = None
+    message_history: List[Dict[str, str]] = field(default_factory=list)
+    max_history_size: int = 5
 
     # Enhanced summary tracker
     tracker: Optional[ConversationTracker] = None
@@ -73,6 +75,30 @@ class UserData:
     def __post_init__(self):
         if self.tracker is None:
             self.tracker = ConversationTracker()
+
+    def add_message(self, role: str, content: str) -> None:
+        """Add a message to history, keeping only the last N messages."""
+        if not content or not content.strip():
+            return
+        self.message_history.append({"role": role, "content": content.strip()})
+        # Keep only last N messages
+        if len(self.message_history) > self.max_history_size:
+            self.message_history = self.message_history[-self.max_history_size:]
+        # Also update last message shortcuts
+        if role == "user":
+            self.last_user_message = content.strip()
+        elif role == "assistant":
+            self.last_agent_message = content.strip()
+
+    def get_recent_history(self) -> str:
+        """Get formatted recent message history for LLM context."""
+        if not self.message_history:
+            return ""
+        lines = ["Recent conversation:"]
+        for msg in self.message_history:
+            role = "User" if msg["role"] == "user" else "Assistant"
+            lines.append(f"- {role}: {msg['content']}")
+        return "\n".join(lines)
 
     def summarize(self) -> str:
         """Generate YAML summary for LLM context - performs better than JSON"""
@@ -202,7 +228,7 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
         self.context = self.user_data
 
     async def on_enter(self) -> None:
-        """Called when agent becomes active - handles initial greeting and context injection"""
+        """Called when agent becomes active - handles context injection."""
         chat_ctx = self.chat_ctx.copy()
 
         # Inject user context if identified
@@ -211,6 +237,15 @@ You are Alya, a friendly and efficient appointment booking assistant. Your prima
                 role="system",
                 content=f"Current user data:\n{self.user_data.summarize()}",
             )
+
+        # Inject recent message history for context continuity
+        recent_history = self.user_data.get_recent_history()
+        if recent_history:
+            chat_ctx.add_message(
+                role="system",
+                content=recent_history,
+            )
+            logger.debug(f"[Context] Injected {len(self.user_data.message_history)} messages into context")
 
         await self.update_chat_ctx(chat_ctx)
 
