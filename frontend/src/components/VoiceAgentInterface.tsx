@@ -51,7 +51,7 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
   // Show toast when connecting
   useEffect(() => {
-    if (!isAgentConnected && connectingToastRef.current === null) {
+    if (!isAgentConnected && !isAvatarInitializing && connectingToastRef.current === null) {
       connectingToastRef.current = toast.loading('Connecting to agent...', {
         duration: Infinity,
       });
@@ -61,8 +61,12 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
         duration: 2000
       });
       connectingToastRef.current = null;
+    } else if (isAvatarInitializing && connectingToastRef.current !== null) {
+      // Dismiss connecting toast when avatar starts initializing
+      toast.dismiss(connectingToastRef.current);
+      connectingToastRef.current = null;
     }
-  }, [isAgentConnected]);
+  }, [isAgentConnected, isAvatarInitializing]);
 
   useEffect(() => {
     if (!room) return;
@@ -81,10 +85,25 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
           return identity.includes('bey');
         });
 
-        if (voiceAgent && beyAgent) {
+        // Check if bey agent has video track that is subscribed and has actual track
+        const beyHasVideo = beyAgent && Array.from(beyAgent.trackPublications.values()).some(
+          pub => pub.kind === Track.Kind.Video && pub.track && pub.isSubscribed
+        );
+
+        if (voiceAgent && beyAgent && beyHasVideo) {
           setIsAgentConnected(true);
+          setIsAvatarInitializing(false);
+        } else if (voiceAgent && beyAgent && !beyHasVideo) {
+          // Both agents present but video not ready yet
+          setIsAvatarInitializing(true);
+          setIsAgentConnected(false);
+        } else if (voiceAgent && !beyAgent) {
+          // Voice agent present, waiting for avatar
+          setIsAvatarInitializing(true);
+          setIsAgentConnected(false);
         } else {
           setIsAgentConnected(false);
+          setIsAvatarInitializing(false);
         }
       } else {
         // Non-avatar mode: Need exactly 1 agent (voice agent only)
@@ -117,6 +136,21 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
       checkForAgent();
     };
 
+    const handleTrackPublished = () => {
+      // Re-check when any track is published (especially video for avatar)
+      checkForAgent();
+    };
+
+    const handleTrackUnpublished = () => {
+      // Re-check when tracks are unpublished
+      checkForAgent();
+    };
+
+    const handleTrackSubscribed = () => {
+      // Re-check when tracks are subscribed (this is when video is actually ready)
+      checkForAgent();
+    };
+
     const handleDataReceived = (payload: Uint8Array) => {
       try {
         const data = JSON.parse(new TextDecoder().decode(payload));
@@ -138,11 +172,17 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
 
     room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
     room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+    room.on(RoomEvent.TrackPublished, handleTrackPublished);
+    room.on(RoomEvent.TrackUnpublished, handleTrackUnpublished);
+    room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     room.on(RoomEvent.DataReceived, handleDataReceived);
 
     return () => {
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+      room.off(RoomEvent.TrackPublished, handleTrackPublished);
+      room.off(RoomEvent.TrackUnpublished, handleTrackUnpublished);
+      room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       room.off(RoomEvent.DataReceived, handleDataReceived);
     };
   }, [room, onToolCall, onConversationEnd, onEndCall, useAvatar]);
@@ -199,20 +239,25 @@ function VoiceAgentInterface({ onToolCall, onConversationEnd, onEndCall, toolCal
     : undefined;
 
   useEffect(() => {
-    if (!useAvatar) {
-      setIsAvatarInitializing(false);
-      return;
-    }
+    if (isAvatarInitializing) {
+      const initToast = toast.loading('Initializing avatar...', {
+        duration: Infinity,
+      });
 
-    if (avatarVideoTrack) {
-      setIsAvatarInitializing(false);
-      return;
+      return () => {
+        toast.dismiss(initToast);
+      };
     }
+  }, [isAvatarInitializing]);
 
-    if (isAgentConnected) {
-      setIsAvatarInitializing(true);
+  // Show success when fully connected
+  useEffect(() => {
+    if (isAgentConnected && !isAvatarInitializing) {
+      toast.success('Agent connected!', {
+        duration: 2000
+      });
     }
-  }, [useAvatar, avatarVideoTrack, isAgentConnected]);
+  }, [isAgentConnected, isAvatarInitializing]);
 
   return (
     <div className="h-screen flex flex-col lg:flex-row overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">

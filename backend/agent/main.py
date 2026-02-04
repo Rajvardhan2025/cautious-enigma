@@ -193,6 +193,26 @@ async def voice_appointment_agent(ctx: JobContext):
         def on_agent_speech_update(msg):
             agent.context.last_agent_message = msg.text
 
+        avatar = None
+        if bey_api_key and avatar_id and use_avatar:
+            try:
+                # Convert HTTP(S) URL to WebSocket format for BEY
+                bey_url = livekit_url
+                if bey_url:
+                    if bey_url.startswith("https://"):
+                        bey_url = bey_url.replace("https://", "wss://")
+                    elif bey_url.startswith("http://"):
+                        bey_url = bey_url.replace("http://", "ws://")
+
+                logger.info("[Avatar] Initializing avatar...")
+                avatar = bey.AvatarSession(avatar_id=avatar_id)
+                await avatar.start(session, room=ctx.room, livekit_url=bey_url)
+                logger.info("[Avatar] Started and ready")
+            except Exception as e:
+                logger.error(f"[Avatar] Failed to start: {e}")
+                avatar = None
+
+        # Now start the session - avatar is already connected
         await session.start(
             agent=agent,
             room=ctx.room,
@@ -209,24 +229,11 @@ async def voice_appointment_agent(ctx: JobContext):
             ),
         )
 
-        logger.info("[Session] Started successfully")
-
-        # Start Beyond Presence avatar after session starts
-        if bey_api_key and avatar_id and use_avatar:
-            try:
-                # Convert HTTP(S) URL to WebSocket format for BEY
-                bey_url = livekit_url
-                if bey_url:
-                    if bey_url.startswith("https://"):
-                        bey_url = bey_url.replace("https://", "wss://")
-                    elif bey_url.startswith("http://"):
-                        bey_url = bey_url.replace("http://", "ws://")
-
-                avatar = bey.AvatarSession(avatar_id=avatar_id)
-                await avatar.start(session, room=ctx.room, livekit_url=bey_url)
-                logger.info("[Avatar] Started")
-            except Exception as e:
-                logger.error(f"[Avatar] Failed to start: {e}")
+        logger.info("[Session] Voice agent started successfully")
+        
+        # Send ready signal to frontend
+        if use_avatar and avatar:
+            logger.info("[Session] Avatar mode fully initialized")
 
     except Exception as e:
         logger.error(f"[Session] Fatal error: {e}", exc_info=True)
